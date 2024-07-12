@@ -7,7 +7,7 @@ use iced::{
     Border, Element, Length, Renderer, Shadow, Size, Theme,
 };
 
-use super::utils::{icon_button, BORDER_RADIUS};
+use super::utils::{icon_button, rounded_button, BORDER_RADIUS};
 
 #[derive(Debug, Clone)]
 pub enum HeaderScreen {
@@ -15,58 +15,60 @@ pub enum HeaderScreen {
     Stream,
 }
 
-pub struct Header<Message> {
+pub struct Header<'a, Message: Clone> {
     screen: HeaderScreen,
     enabled: bool,
     on_switch: Box<dyn Fn(HeaderScreen) -> Message>,
+    profile_name: &'a str,
     on_profile_name_change: Box<dyn Fn(String) -> Message>,
-    on_profile_import: Box<dyn Fn() -> Message>,
-    on_profile_export: Box<dyn Fn() -> Message>,
-    on_profile_add: Box<dyn Fn() -> Message>,
-    on_end_stream: Option<Box<dyn Fn() -> Message>>,
+    on_profile_import: Message,
+    on_profile_export: Message,
+    on_profile_add: Message,
+    on_end_stream: Option<Message>,
 }
 
-impl<Message> Header<Message> {
+impl<'a, Message: Clone> Header<'a, Message> {
     pub fn new(
         screen: HeaderScreen,
         enabled: bool,
         on_switch: impl Fn(HeaderScreen) -> Message + 'static,
+        profile_name: &'a str,
         on_profile_name_change: impl Fn(String) -> Message + 'static,
-        on_profile_import: impl Fn() -> Message + 'static,
-        on_profile_export: impl Fn() -> Message + 'static,
-        on_profile_add: impl Fn() -> Message + 'static,
-        on_end_stream: Option<impl Fn() -> Message + 'static>,
+        on_profile_import: Message,
+        on_profile_export: Message,
+        on_profile_add: Message,
+        on_end_stream: Option<Message>,
     ) -> Header<Message> {
         Header::<Message> {
             screen,
             enabled,
             on_switch: Box::new(on_switch),
+            profile_name,
             on_profile_name_change: Box::new(on_profile_name_change),
-            on_profile_import: Box::new(on_profile_import),
-            on_profile_export: Box::new(on_profile_export),
-            on_profile_add: Box::new(on_profile_add),
-            on_end_stream: match on_end_stream {
-                Some(x) => Some(Box::new(x)),
-                None => None,
-            },
+            on_profile_import,
+            on_profile_export,
+            on_profile_add,
+            on_end_stream,
         }
     }
 }
 
-pub fn header<Message>(
+pub fn header<Message: Clone>(
     screen: HeaderScreen,
     enabled: bool,
     on_switch: impl Fn(HeaderScreen) -> Message + 'static,
+    profile_name: &str,
     on_profile_name_change: impl Fn(String) -> Message + 'static,
-    on_profile_import: impl Fn() -> Message + 'static,
-    on_profile_export: impl Fn() -> Message + 'static,
-    on_profile_add: impl Fn() -> Message + 'static,
-    on_end_stream: Option<impl Fn() -> Message + 'static>,
+    on_profile_import: Message,
+    on_profile_export: Message,
+    on_profile_add: Message,
+    on_end_stream: Option<Message>,
 ) -> Header<Message> {
     Header::<Message>::new(
         screen,
         enabled,
         on_switch,
+        profile_name,
         on_profile_name_change,
         on_profile_import,
         on_profile_export,
@@ -99,7 +101,7 @@ impl Default for HeaderState {
     }
 }
 
-impl<Message> Component<Message> for Header<Message> {
+impl<Message: Clone> Component<Message> for Header<'_, Message> {
     type State = HeaderState;
 
     type Event = HeaderEvent;
@@ -110,9 +112,9 @@ impl<Message> Component<Message> for Header<Message> {
             HeaderEvent::ProfileNameChange(new_name) => {
                 Some((self.on_profile_name_change)(new_name))
             }
-            HeaderEvent::ProfileImport => Some((self.on_profile_import)()),
-            HeaderEvent::ProfileExport => Some((self.on_profile_export)()),
-            HeaderEvent::ProfileAdd => Some((self.on_profile_add)()),
+            HeaderEvent::ProfileImport => Some(self.on_profile_import.clone()),
+            HeaderEvent::ProfileExport => Some(self.on_profile_export.clone()),
+            HeaderEvent::ProfileAdd => Some(self.on_profile_add.clone()),
             HeaderEvent::OpenEndStreamConfirm => {
                 state.is_showing_end_stream_confirm = true;
                 None
@@ -123,7 +125,7 @@ impl<Message> Component<Message> for Header<Message> {
             }
             HeaderEvent::EndStreamConfirmYes => {
                 state.is_showing_end_stream_confirm = false;
-                self.on_end_stream.as_ref().map(|f| (f)())
+                self.on_end_stream.clone()
             }
         }
     }
@@ -134,7 +136,7 @@ impl<Message> Component<Message> for Header<Message> {
                 text("Daktronics Singular UI").size(18).into(),
                 horizontal_space().into(),
                 {
-                    let input = text_input("Profile name", "")
+                    let input = text_input("Profile name", self.profile_name)
                         .style(|theme, status| {
                             let mut style = text_input::default(theme, status);
                             style.border.radius = Radius::from(BORDER_RADIUS);
@@ -149,15 +151,24 @@ impl<Message> Component<Message> for Header<Message> {
                     }
                 }
                 .into(),
-                icon_button(include_bytes!("../../assets/icon_download.svg"))
-                    .on_press_maybe(self.enabled.then_some(HeaderEvent::ProfileImport))
-                    .into(),
-                icon_button(include_bytes!("../../assets/icon_upload.svg"))
-                    .on_press_maybe(self.enabled.then_some(HeaderEvent::ProfileExport))
-                    .into(),
-                icon_button(include_bytes!("../../assets/icon_add_circle.svg"))
-                    .on_press_maybe(self.enabled.then_some(HeaderEvent::ProfileAdd))
-                    .into(),
+                icon_button(
+                    include_bytes!("../../assets/icon_download.svg"),
+                    "Import profile",
+                    self.enabled.then_some(HeaderEvent::ProfileImport),
+                )
+                .into(),
+                icon_button(
+                    include_bytes!("../../assets/icon_upload.svg"),
+                    "Export profile",
+                    self.enabled.then_some(HeaderEvent::ProfileExport),
+                )
+                .into(),
+                icon_button(
+                    include_bytes!("../../assets/icon_add_circle.svg"),
+                    "New profile",
+                    self.enabled.then_some(HeaderEvent::ProfileAdd),
+                )
+                .into(),
             ])
             .align_items(iced::Alignment::Center)
             .padding(14)
@@ -209,35 +220,29 @@ impl<Message> Component<Message> for Header<Message> {
                         row(if state.is_showing_end_stream_confirm {
                             [
                                 text("Are you sure you want to end the stream?").into(),
-                                button(text("Cancel"))
-                                    .style(|theme, status| {
-                                        let mut style = button::secondary(theme, status);
-                                        style.border.radius = 999.into();
-                                        style
-                                    })
-                                    .on_press(HeaderEvent::EndStreamConfirmCancel)
-                                    .into(),
-                                button(text("Confirm"))
-                                    .style(|theme, status| {
-                                        let mut style = button::danger(theme, status);
-                                        style.border.radius = Radius::from(999);
-                                        style
-                                    })
-                                    .on_press(HeaderEvent::EndStreamConfirmYes)
-                                    .into(),
+                                rounded_button(
+                                    "Cancel",
+                                    super::utils::RoundedButtonVariant::Secondary,
+                                )
+                                .on_press(HeaderEvent::EndStreamConfirmCancel)
+                                .into(),
+                                rounded_button(
+                                    "Confirm",
+                                    super::utils::RoundedButtonVariant::Danger,
+                                )
+                                .on_press(HeaderEvent::EndStreamConfirmYes)
+                                .into(),
                             ]
                         } else {
                             [
                                 text("Danger zone").into(),
                                 Space::new(0, 0).into(),
-                                button(text("End stream"))
-                                    .style(|theme, status| {
-                                        let mut style = button::danger(theme, status);
-                                        style.border.radius = 999.into();
-                                        style
-                                    })
-                                    .on_press(HeaderEvent::OpenEndStreamConfirm)
-                                    .into(),
+                                rounded_button(
+                                    "End stream",
+                                    super::utils::RoundedButtonVariant::Secondary,
+                                )
+                                .on_press(HeaderEvent::OpenEndStreamConfirm)
+                                .into(),
                             ]
                         })
                         .align_items(iced::Alignment::Center)
@@ -274,11 +279,11 @@ impl<Message> Component<Message> for Header<Message> {
     }
 }
 
-impl<'a, Message> From<Header<Message>> for Element<'a, Message>
+impl<'a, Message: Clone> From<Header<'a, Message>> for Element<'a, Message>
 where
     Message: 'a,
 {
-    fn from(header: Header<Message>) -> Self {
+    fn from(header: Header<'a, Message>) -> Self {
         component(header)
     }
 }

@@ -140,7 +140,7 @@ mod transformation {
     impl Error for TransformationError {}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Mapping {
     pub items: Vec<MappingItem>,
 }

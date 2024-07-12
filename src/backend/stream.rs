@@ -19,15 +19,18 @@ use super::{network::put_to_server, profile::Profile};
 mod latency_graph {
     use std::time::{Duration, Instant};
 
+    #[derive(Debug)]
     pub struct LatencySample {
         pub timestamp: Instant,
         pub latency: Duration,
     }
 
+    #[derive(Debug)]
     pub struct SerialEvent {
         pub timestamp: Instant,
     }
 
+    #[derive(Debug)]
     pub struct LatencyGraphData {
         pub samples: Vec<LatencySample>,
         pub serial_events: Vec<SerialEvent>,
@@ -40,6 +43,7 @@ enum WorkerEvent {
     LatencySampleEvent(LatencySample),
 }
 
+#[derive(Debug)]
 pub struct ActiveStream {
     latency_graph_data: LatencyGraphData,
     /// The payload about to undergo processing
@@ -72,7 +76,10 @@ impl ActiveStream {
         let rtd_state = RTDState::from_serial_stream(port, true)?;
 
         let serialized = Arc::new(Mutex::new(None));
-        let mut sport = config.sport_type.as_dynamic_sport(rtd_state);
+        let mut sport = config
+            .sport_type
+            .ok_or("You must specify a sport before streaming.")?
+            .as_dynamic_sport(rtd_state);
 
         let (new_msg_tx, mut new_msg_rx) = mpsc::unbounded_channel();
 
