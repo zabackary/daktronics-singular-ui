@@ -299,5 +299,8 @@ impl ActiveStream {
 }
 
 impl Drop for ActiveStream {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        self.serial_join_handle.abort();
+        self.serial_join_handle.abort();
+    }
 }
