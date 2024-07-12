@@ -3,8 +3,9 @@ use std::fmt::Debug;
 use daktronics_allsport_5000::{
     rtd_state::data_source::RTDStateDataSource, sports::basketball::BasketballSport, RTDState,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum DynamicSportType {
     Basketball,
 }

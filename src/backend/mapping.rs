@@ -1,11 +1,14 @@
 use std::{error::Error, fmt::Display};
 
+use serde::{Deserialize, Serialize};
 use transformation::{Transformation, TransformationError};
 
 mod transformation {
     use std::{error::Error, fmt::Display, num::ParseIntError};
 
-    #[derive(Debug, Clone, Copy)]
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
     pub enum Transformation {
         TimeMinutes,
         TimeSeconds,
@@ -137,7 +140,7 @@ mod transformation {
     impl Error for TransformationError {}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mapping {
     pub items: Vec<MappingItem>,
 }
@@ -154,7 +157,7 @@ impl Mapping {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MappingItem {
     pub enabled: bool,
     pub source_field: String,

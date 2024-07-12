@@ -1,7 +1,17 @@
+use frontend::DaktronicsSingularUiApp;
+
 mod backend;
 mod frontend;
 
 const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 8)]
-async fn main() {}
+fn main() -> iced::Result {
+    iced::application(
+        "Daktronics Singular UI",
+        DaktronicsSingularUiApp::update,
+        DaktronicsSingularUiApp::view,
+    )
+    .theme(|_| iced::theme::Theme::KanagawaWave)
+    .exit_on_close_request(true)
+    .run()
+}

@@ -14,7 +14,7 @@ use tokio_serial::SerialPortBuilderExt;
 
 use crate::APP_USER_AGENT;
 
-use super::{config::Config, network::put_to_server};
+use super::{network::put_to_server, profile::Profile};
 
 mod latency_graph {
     use std::time::{Duration, Instant};
@@ -48,7 +48,7 @@ pub struct ActiveStream {
     latest_payload: String,
     errors: Vec<Box<dyn Error>>,
 
-    config: Config,
+    config: Profile,
 
     serial_join_handle: JoinHandle<()>,
     network_processing_join_handle: JoinHandle<()>,
@@ -56,7 +56,7 @@ pub struct ActiveStream {
 }
 
 impl ActiveStream {
-    pub fn new(config: Config, tty_path: String) -> Result<Self, Box<dyn Error>> {
+    pub fn new(config: Profile, tty_path: String) -> Result<Self, Box<dyn Error>> {
         let (worker_event_tx, worker_event_rx) = mpsc::channel(255);
 
         // allow because cargo gets suspicious on Windows
