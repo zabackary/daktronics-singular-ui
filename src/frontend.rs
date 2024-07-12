@@ -5,7 +5,7 @@ use std::fmt::Display;
 
 use header::{header, HeaderScreen};
 use iced::widget::{column, container, pick_list, row, text};
-use iced::{Alignment, Element, Length, Task};
+use iced::{Alignment, Border, Element, Length, Shadow, Task};
 use tokio_serial::SerialPortInfo;
 use utils::{icon_button, rounded_button, BORDER_RADIUS};
 
@@ -61,7 +61,11 @@ pub enum Message {
 enum Screen {
     Configure,
     Stream(ActiveStream),
-    StreamStart(Vec<SerialPortInfoWrapper>, Option<SerialPortInfoWrapper>),
+    StreamStart(
+        Vec<SerialPortInfoWrapper>,
+        Option<SerialPortInfoWrapper>,
+        Option<String>,
+    ),
     #[default]
     Welcome,
 }
@@ -92,26 +96,42 @@ impl DaktronicsSingularUiApp {
             Message::WelcomeNewProfile => {
                 self.screen = Screen::Configure;
             }
-            Message::StartStream => {
-                self.screen = Screen::Stream(todo!("get the active stream somehow"));
-            }
+            Message::StartStream => match self.screen {
+                Screen::StreamStart(_, ref port, ref mut error) => {
+                    self.profile.sport_type =
+                        Some(crate::backend::sports::DynamicSportType::Basketball);
+                    match ActiveStream::new(
+                        self.profile.to_owned(),
+                        "".into(), // TODO: use actual port
+                                   // port.as_ref().expect("port is None").0.port_name.to_owned(),
+                    ) {
+                        Ok(stream) => {
+                            self.screen = Screen::Stream(stream);
+                        }
+                        Err(err) => *error = Some(err.to_string()),
+                    }
+                }
+                _ => {}
+            },
             Message::EndStream => {
                 // Drop the stream, killing the background threads automatically
-                self.screen = Screen::StreamStart(enumerate_ports(), None);
+                self.screen = Screen::StreamStart(enumerate_ports(), None, None);
             }
             Message::ProfileNameChange(new_name) => self.profile.name = new_name,
             Message::SwitchScreen(new_screen) => {
                 self.screen = match new_screen {
                     HeaderScreen::Configure => Screen::Configure,
-                    HeaderScreen::Stream => Screen::StreamStart(enumerate_ports(), None),
+                    HeaderScreen::Stream => Screen::StreamStart(enumerate_ports(), None, None),
                 }
             }
             Message::SerialPortPicked(new_port) => match self.screen {
-                Screen::StreamStart(_, ref mut selected_port) => *selected_port = Some(new_port),
+                Screen::StreamStart(_, ref mut selected_port, _) => *selected_port = Some(new_port),
                 _ => {}
             },
             Message::RefreshSerialPorts => match self.screen {
-                Screen::StreamStart(ref mut serial_ports, _) => *serial_ports = enumerate_ports(),
+                Screen::StreamStart(ref mut serial_ports, _, _) => {
+                    *serial_ports = enumerate_ports()
+                }
                 _ => {}
             },
         }
@@ -166,7 +186,7 @@ impl DaktronicsSingularUiApp {
                 header(
                     match self.screen {
                         Screen::Configure => HeaderScreen::Configure,
-                        Screen::Stream(_) | Screen::StreamStart(_, _) => HeaderScreen::Stream,
+                        Screen::Stream(_) | Screen::StreamStart(_, _, _) => HeaderScreen::Stream,
                         Screen::Welcome => unreachable!(),
                     },
                     !matches!(self.screen, Screen::Stream(_)),
@@ -182,9 +202,9 @@ impl DaktronicsSingularUiApp {
                 match &self.screen {
                     Screen::Configure => column([]).height(Length::Fill).width(Length::Fill).into(),
                     Screen::Stream(_active_stream) => {
-                        todo!()
+                        container(text("latency")).center(Length::Fill).into()
                     }
-                    Screen::StreamStart(serial_ports, selected_serial_port) => container(
+                    Screen::StreamStart(serial_ports, selected_serial_port, error) => container(
                         column([
                             text("Ready to get started?")
                                 .style(|theme: &iced::Theme| text::Style {
@@ -216,13 +236,30 @@ impl DaktronicsSingularUiApp {
                                 icon_button(
                                     include_bytes!("../assets/icon_play_circle.svg"),
                                     "Start stream",
-                                    Some(Message::StartStream),
+                                    Some(Message::StartStream), // TODO: actually select port
+                                                                // selected_serial_port
+                                                                //     .is_some()
+                                                                //     .then_some(Message::StartStream),
                                 )
                                 .into(),
                             ])
                             .spacing(4)
                             .into(),
                         ])
+                        .push_maybe(error.as_ref().map(|error| {
+                            container(text(error))
+                                .style(|theme: &iced::Theme| container::Style {
+                                    background: None,
+                                    text_color: None,
+                                    shadow: Shadow::default(),
+                                    border: Border {
+                                        color: theme.palette().danger,
+                                        width: 1.0,
+                                        radius: 999.into(),
+                                    },
+                                })
+                                .padding([4, 12])
+                        }))
                         .spacing(16)
                         .align_items(Alignment::Center),
                     )

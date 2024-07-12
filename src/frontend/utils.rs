@@ -28,7 +28,7 @@ pub fn icon_button<'a, Message: Clone + 'a>(
         .padding(8)
         .width(36)
         .height(36),
-        container(label).style(container::rounded_box).padding(8),
+        container(label).style(container::rounded_box).padding(4),
         tooltip::Position::Bottom,
     )
 }

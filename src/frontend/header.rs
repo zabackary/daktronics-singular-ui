@@ -131,52 +131,52 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
     }
 
     fn view(&self, state: &Self::State) -> Element<'_, Self::Event, Theme, Renderer> {
-        column([
-            row([
-                text("Daktronics Singular UI").size(18).into(),
-                horizontal_space().into(),
-                {
-                    let input = text_input("Profile name", self.profile_name)
-                        .style(|theme, status| {
-                            let mut style = text_input::default(theme, status);
-                            style.border.radius = Radius::from(BORDER_RADIUS);
-                            style
-                        })
-                        .padding(8)
-                        .width(300);
-                    if self.enabled {
-                        input.on_input(HeaderEvent::ProfileNameChange)
-                    } else {
-                        input
+        container(
+            column([
+                row([
+                    text("Daktronics Singular UI").size(18).into(),
+                    horizontal_space().into(),
+                    {
+                        let input = text_input("Profile name", self.profile_name)
+                            .style(|theme, status| {
+                                let mut style = text_input::default(theme, status);
+                                style.border.radius = Radius::from(BORDER_RADIUS);
+                                style
+                            })
+                            .padding(8)
+                            .width(300);
+                        if self.enabled {
+                            input.on_input(HeaderEvent::ProfileNameChange)
+                        } else {
+                            input
+                        }
                     }
-                }
+                    .into(),
+                    icon_button(
+                        include_bytes!("../../assets/icon_download.svg"),
+                        "Import profile",
+                        self.enabled.then_some(HeaderEvent::ProfileImport),
+                    )
+                    .into(),
+                    icon_button(
+                        include_bytes!("../../assets/icon_upload.svg"),
+                        "Export profile",
+                        self.enabled.then_some(HeaderEvent::ProfileExport),
+                    )
+                    .into(),
+                    icon_button(
+                        include_bytes!("../../assets/icon_add_circle.svg"),
+                        "New profile",
+                        self.enabled.then_some(HeaderEvent::ProfileAdd),
+                    )
+                    .into(),
+                ])
+                .align_items(iced::Alignment::Center)
+                .padding(14)
+                .spacing(4)
+                .width(Length::Fill)
                 .into(),
-                icon_button(
-                    include_bytes!("../../assets/icon_download.svg"),
-                    "Import profile",
-                    self.enabled.then_some(HeaderEvent::ProfileImport),
-                )
-                .into(),
-                icon_button(
-                    include_bytes!("../../assets/icon_upload.svg"),
-                    "Export profile",
-                    self.enabled.then_some(HeaderEvent::ProfileExport),
-                )
-                .into(),
-                icon_button(
-                    include_bytes!("../../assets/icon_add_circle.svg"),
-                    "New profile",
-                    self.enabled.then_some(HeaderEvent::ProfileAdd),
-                )
-                .into(),
-            ])
-            .align_items(iced::Alignment::Center)
-            .padding(14)
-            .spacing(4)
-            .width(Length::Fill)
-            .into(),
-            row([
-                container(row([
+                row([container(row([
                     button(text("Configure"))
                         .style(|theme, status| {
                             let mut style = if matches!(self.screen, HeaderScreen::Configure) {
@@ -214,8 +214,8 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                 ]))
                 .width(Length::Fill)
                 .align_x(iced::alignment::Horizontal::Center)
-                .into(),
-                if self.on_end_stream.is_some() {
+                .into()])
+                .push_maybe(self.on_end_stream.is_some().then(|| {
                     container(
                         row(if state.is_showing_end_stream_confirm {
                             [
@@ -259,15 +259,20 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                         },
                     })
                     .padding([4, 4, 4, 12])
-                    .into()
-                } else {
-                    Space::new(0, 0).into()
-                },
+                }))
+                .into(),
+                horizontal_rule(2).into(),
             ])
-            .into(),
-            horizontal_rule(2).into(),
-        ])
-        .width(Length::Fill)
+            .width(Length::Fill),
+        )
+        .style(|theme| {
+            if self.enabled {
+                container::transparent(theme)
+            } else {
+                container::transparent(theme)
+                    .with_background(theme.extended_palette().primary.weak.color.scale_alpha(0.2))
+            }
+        })
         .into()
     }
 

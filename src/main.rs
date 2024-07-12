@@ -2,6 +2,7 @@ use frontend::DaktronicsSingularUiApp;
 
 mod backend;
 mod frontend;
+mod mock;
 
 const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 

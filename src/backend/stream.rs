@@ -1,18 +1,21 @@
 use std::{
     error::Error,
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
-use daktronics_allsport_5000::{sports::Sport, RTDState};
+use daktronics_allsport_5000::{rtd_state, sports::Sport, RTDState};
 use latency_graph::{LatencyGraphData, LatencySample, SerialEvent};
 use tokio::{
-    sync::mpsc::{self, Receiver},
+    sync::{
+        mpsc::{self, Receiver},
+        Mutex,
+    },
     task::JoinHandle,
 };
 use tokio_serial::SerialPortBuilderExt;
 
-use crate::APP_USER_AGENT;
+use crate::{mock::MockDataSource, APP_USER_AGENT};
 
 use super::{network::put_to_server, profile::Profile};
 
@@ -63,7 +66,7 @@ impl ActiveStream {
     pub fn new(config: Profile, tty_path: String) -> Result<Self, Box<dyn Error>> {
         let (worker_event_tx, worker_event_rx) = mpsc::channel(255);
 
-        // allow because cargo gets suspicious on Windows
+        /*// allow because cargo gets suspicious on Windows
         #[allow(unused_mut)]
         let mut port = tokio_serial::new(tty_path, 19200)
             .parity(tokio_serial::Parity::None)
@@ -73,7 +76,8 @@ impl ActiveStream {
         port.set_exclusive(false)
             .expect("unable to set serial port exclusive to false");
 
-        let rtd_state = RTDState::from_serial_stream(port, true)?;
+        let rtd_state = RTDState::from_serial_stream(port, true)?;*/
+        let rtd_state = RTDState::new(MockDataSource::new());
 
         let serialized = Arc::new(Mutex::new(None));
         let mut sport = config
@@ -95,9 +99,15 @@ impl ActiveStream {
                         Ok(true) => match sport.serialize_to_value() {
                             Ok(new_data) => {
                                 {
-                                    let mut serialized = serialized.lock().unwrap();
+                                    let mut serialized = serialized.lock().await;
                                     *serialized = Some(new_data);
                                 }
+                                worker_event_tx
+                                    .send(WorkerEvent::SerialEvent(SerialEvent {
+                                        timestamp: Instant::now(),
+                                    }))
+                                    .await
+                                    .expect("worker event tx closed!");
                                 if let Err(err) = new_msg_tx.send(()) {
                                     worker_event_tx
                                         .send(WorkerEvent::ErrorEvent(Box::new(err)))
@@ -118,6 +128,7 @@ impl ActiveStream {
                             .await
                             .expect("worker event tx closed!"),
                     }
+                    tokio::task::yield_now().await;
                 }
             })
         };
@@ -142,7 +153,7 @@ impl ActiveStream {
                 }
 
                 loop {
-                    let serialized = { serialized.lock().unwrap().take() };
+                    let serialized = { serialized.lock().await.take() };
                     if let Some(value) = serialized {
                         match mapping.map(&value) {
                             Ok(serialized) => {
@@ -202,6 +213,11 @@ impl ActiveStream {
                                 .expect("worker event tx closed!"),
                         }
                     }
+                    if new_msg_rx.is_empty() {
+                        // if it's empty right now, wait for the next signal
+                        new_msg_rx.recv().await;
+                    }
+                    // flush the signal stream and go again
                     while !new_msg_rx.is_empty() {
                         new_msg_rx.recv().await;
                     }
@@ -277,6 +293,7 @@ impl ActiveStream {
                 }
             }
         }
+        self.purge_old_latency_graph_data(Duration::from_secs(60 * 5))
     }
 
     pub fn latency_graph_data(&self) -> &LatencyGraphData {
@@ -301,6 +318,6 @@ impl ActiveStream {
 impl Drop for ActiveStream {
     fn drop(&mut self) {
         self.serial_join_handle.abort();
-        self.serial_join_handle.abort();
+        self.network_processing_join_handle.abort();
     }
 }
