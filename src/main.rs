@@ -13,6 +13,5 @@ fn main() -> iced::Result {
         DaktronicsSingularUiApp::view,
     )
     .theme(|_| iced::theme::Theme::KanagawaWave)
-    .exit_on_close_request(true)
     .run()
 }
