@@ -1,13 +1,12 @@
 mod header;
+mod stream_start;
 mod utils;
 
-use std::fmt::Display;
-
 use header::{header, HeaderScreen};
-use iced::widget::{column, container, pick_list, row, text};
-use iced::{Alignment, Border, Element, Length, Shadow, Task};
-use tokio_serial::SerialPortInfo;
-use utils::{icon_button, rounded_button, BORDER_RADIUS};
+use iced::widget::{column, container, row, text};
+use iced::{Alignment, Element, Length, Task};
+use stream_start::stream_start;
+use utils::rounded_button;
 
 use crate::backend::profile::Profile;
 use crate::backend::stream::ActiveStream;
@@ -18,30 +17,6 @@ pub struct DaktronicsSingularUiApp {
     profile: Profile,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SerialPortInfoWrapper(SerialPortInfo);
-
-impl Display for SerialPortInfoWrapper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.0.port_type {
-            tokio_serial::SerialPortType::UsbPort(info) => write!(
-                f,
-                "{} ({} {})",
-                self.0.port_name,
-                info.manufacturer
-                    .as_ref()
-                    .map(String::as_ref)
-                    .unwrap_or("unknown manufacturer"),
-                info.product
-                    .as_ref()
-                    .map(String::as_ref)
-                    .unwrap_or("unknown product")
-            ),
-            _ => write!(f, "{}", self.0.port_name),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum Message {
     NewProfile,
@@ -49,33 +24,19 @@ pub enum Message {
     ExportProfile,
     WelcomeNewProfile,
     WelcomeImportProfile,
-    StartStream,
+    StartStream(String),
     EndStream,
     SwitchScreen(HeaderScreen),
     ProfileNameChange(String),
-    SerialPortPicked(SerialPortInfoWrapper),
-    RefreshSerialPorts,
 }
 
 #[derive(Debug, Default)]
 enum Screen {
     Configure,
     Stream(ActiveStream),
-    StreamStart(
-        Vec<SerialPortInfoWrapper>,
-        Option<SerialPortInfoWrapper>,
-        Option<String>,
-    ),
+    StreamStart(Option<String>),
     #[default]
     Welcome,
-}
-
-fn enumerate_ports() -> Vec<SerialPortInfoWrapper> {
-    tokio_serial::available_ports()
-        .unwrap_or(vec![])
-        .into_iter()
-        .map(SerialPortInfoWrapper)
-        .collect()
 }
 
 impl DaktronicsSingularUiApp {
@@ -96,15 +57,11 @@ impl DaktronicsSingularUiApp {
             Message::WelcomeNewProfile => {
                 self.screen = Screen::Configure;
             }
-            Message::StartStream => match self.screen {
-                Screen::StreamStart(_, ref port, ref mut error) => {
+            Message::StartStream(tty_path) => match self.screen {
+                Screen::StreamStart(ref mut error) => {
                     self.profile.sport_type =
                         Some(crate::backend::sports::DynamicSportType::Basketball);
-                    match ActiveStream::new(
-                        self.profile.to_owned(),
-                        "".into(), // TODO: use actual port
-                                   // port.as_ref().expect("port is None").0.port_name.to_owned(),
-                    ) {
+                    match ActiveStream::new(self.profile.to_owned(), tty_path) {
                         Ok(stream) => {
                             self.screen = Screen::Stream(stream);
                         }
@@ -115,25 +72,15 @@ impl DaktronicsSingularUiApp {
             },
             Message::EndStream => {
                 // Drop the stream, killing the background threads automatically
-                self.screen = Screen::StreamStart(enumerate_ports(), None, None);
+                self.screen = Screen::StreamStart(None);
             }
             Message::ProfileNameChange(new_name) => self.profile.name = new_name,
             Message::SwitchScreen(new_screen) => {
                 self.screen = match new_screen {
                     HeaderScreen::Configure => Screen::Configure,
-                    HeaderScreen::Stream => Screen::StreamStart(enumerate_ports(), None, None),
+                    HeaderScreen::Stream => Screen::StreamStart(None),
                 }
             }
-            Message::SerialPortPicked(new_port) => match self.screen {
-                Screen::StreamStart(_, ref mut selected_port, _) => *selected_port = Some(new_port),
-                _ => {}
-            },
-            Message::RefreshSerialPorts => match self.screen {
-                Screen::StreamStart(ref mut serial_ports, _, _) => {
-                    *serial_ports = enumerate_ports()
-                }
-                _ => {}
-            },
         }
     }
 
@@ -186,7 +133,7 @@ impl DaktronicsSingularUiApp {
                 header(
                     match self.screen {
                         Screen::Configure => HeaderScreen::Configure,
-                        Screen::Stream(_) | Screen::StreamStart(_, _, _) => HeaderScreen::Stream,
+                        Screen::Stream(_) | Screen::StreamStart(_) => HeaderScreen::Stream,
                         Screen::Welcome => unreachable!(),
                     },
                     !matches!(self.screen, Screen::Stream(_)),
@@ -204,70 +151,9 @@ impl DaktronicsSingularUiApp {
                     Screen::Stream(_active_stream) => {
                         container(text("latency")).center(Length::Fill).into()
                     }
-                    Screen::StreamStart(serial_ports, selected_serial_port, error) => container(
-                        column([
-                            text("Ready to get started?")
-                                .style(|theme: &iced::Theme| text::Style {
-                                    color: Some(theme.palette().text),
-                                })
-                                .size(32)
-                                .into(),
-                            row([
-                                pick_list(
-                                    &serial_ports[..],
-                                    selected_serial_port.as_ref(),
-                                    Message::SerialPortPicked,
-                                )
-                                .placeholder("Serial port")
-                                .padding(8)
-                                .width(300)
-                                .style(|theme, status| {
-                                    let mut style = pick_list::default(theme, status);
-                                    style.border.radius = BORDER_RADIUS.into();
-                                    style
-                                })
-                                .into(),
-                                icon_button(
-                                    include_bytes!("../assets/icon_refresh.svg"),
-                                    "Refresh ports",
-                                    Some(Message::RefreshSerialPorts),
-                                )
-                                .into(),
-                                icon_button(
-                                    include_bytes!("../assets/icon_play_circle.svg"),
-                                    "Start stream",
-                                    Some(Message::StartStream), // TODO: actually select port
-                                                                // selected_serial_port
-                                                                //     .is_some()
-                                                                //     .then_some(Message::StartStream),
-                                )
-                                .into(),
-                            ])
-                            .spacing(4)
-                            .into(),
-                        ])
-                        .push_maybe(error.as_ref().map(|error| {
-                            container(text(error))
-                                .style(|theme: &iced::Theme| container::Style {
-                                    background: None,
-                                    text_color: None,
-                                    shadow: Shadow::default(),
-                                    border: Border {
-                                        color: theme.palette().danger,
-                                        width: 1.0,
-                                        radius: 999.into(),
-                                    },
-                                })
-                                .padding([4, 12])
-                        }))
-                        .spacing(16)
-                        .align_items(Alignment::Center),
-                    )
-                    .align_y(iced::alignment::Vertical::Center)
-                    .align_x(iced::alignment::Horizontal::Center)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .into(),
+                    Screen::StreamStart(error) => {
+                        stream_start(Message::StartStream, error.as_deref()).into()
+                    }
                     Screen::Welcome => unreachable!(),
                 },
             ])

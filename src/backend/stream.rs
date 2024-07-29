@@ -43,7 +43,7 @@ mod latency_graph {
 enum WorkerEvent {
     ErrorEvent(Box<dyn Error + Send>),
     SerialEvent(SerialEvent),
-    LatencySampleEvent(LatencySample),
+    LatencySampleEvent(LatencySample, Option<String>),
 }
 
 #[derive(Debug)]
@@ -52,7 +52,7 @@ pub struct ActiveStream {
     /// The payload about to undergo processing
     serialized: Arc<Mutex<Option<serde_json::Value>>>,
     /// The latest payload the server is currently holding right now
-    latest_payload: String,
+    latest_payload: Option<String>,
     errors: Vec<Box<dyn Error>>,
 
     config: Profile,
@@ -157,6 +157,8 @@ impl ActiveStream {
                     if let Some(value) = serialized {
                         match mapping.map(&value) {
                             Ok(serialized) => {
+                                let pretty_stringified =
+                                    serde_json::to_string_pretty(&serialized).ok();
                                 if config.multiple_requests {
                                     let client = client.clone();
                                     let data_stream_url = data_stream_url.clone();
@@ -180,6 +182,7 @@ impl ActiveStream {
                                                         timestamp: Instant::now(),
                                                         latency,
                                                     },
+                                                    pretty_stringified,
                                                 ))
                                                 .await
                                                 .expect("worker event tx closed!"),
@@ -198,10 +201,13 @@ impl ActiveStream {
                                             .await
                                             .expect("worker event tx closed!"),
                                         Ok(latency) => worker_event_tx
-                                            .send(WorkerEvent::LatencySampleEvent(LatencySample {
-                                                timestamp: Instant::now(),
-                                                latency,
-                                            }))
+                                            .send(WorkerEvent::LatencySampleEvent(
+                                                LatencySample {
+                                                    timestamp: Instant::now(),
+                                                    latency,
+                                                },
+                                                pretty_stringified,
+                                            ))
                                             .await
                                             .expect("worker event tx closed!"),
                                     }
@@ -227,42 +233,11 @@ impl ActiveStream {
 
         Ok(Self {
             latency_graph_data: LatencyGraphData {
-                samples: vec![
-                    LatencySample {
-                        timestamp: Instant::now().checked_sub(Duration::from_secs(3)).unwrap(),
-                        latency: Duration::from_millis(340),
-                    },
-                    LatencySample {
-                        timestamp: Instant::now().checked_sub(Duration::from_secs(2)).unwrap(),
-                        latency: Duration::from_millis(320),
-                    },
-                    LatencySample {
-                        timestamp: Instant::now()
-                            .checked_sub(Duration::from_millis(600))
-                            .unwrap(),
-                        latency: Duration::from_millis(312),
-                    },
-                ],
-                serial_events: vec![
-                    SerialEvent {
-                        timestamp: Instant::now()
-                            .checked_sub(Duration::from_millis(3350))
-                            .unwrap(),
-                    },
-                    SerialEvent {
-                        timestamp: Instant::now()
-                            .checked_sub(Duration::from_millis(2330))
-                            .unwrap(),
-                    },
-                    SerialEvent {
-                        timestamp: Instant::now()
-                            .checked_sub(Duration::from_millis(1020))
-                            .unwrap(),
-                    },
-                ],
+                samples: vec![],
+                serial_events: vec![],
             },
             serialized,
-            latest_payload: "{\n    \"key\": \"value\"\n}".into(),
+            latest_payload: None,
             errors: vec![],
             // config: Config {
             //     data_stream_url: "https://datastreams.singular.live/whatever".into(),
@@ -284,7 +259,8 @@ impl ActiveStream {
             if let Some(event) = event {
                 match event {
                     WorkerEvent::ErrorEvent(err) => self.errors.push(err),
-                    WorkerEvent::LatencySampleEvent(sample) => {
+                    WorkerEvent::LatencySampleEvent(sample, latest_payload) => {
+                        self.latest_payload = latest_payload;
                         self.latency_graph_data.samples.push(sample)
                     }
                     WorkerEvent::SerialEvent(event) => {
@@ -300,8 +276,8 @@ impl ActiveStream {
         &self.latency_graph_data
     }
 
-    pub fn latest_payload(&self) -> &str {
-        &self.latest_payload
+    pub fn latest_payload(&self) -> Option<&str> {
+        self.latest_payload.as_ref().map(String::as_str)
     }
 
     /// Deletes all latency graph data with ages more than the specific duration
