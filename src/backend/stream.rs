@@ -22,26 +22,27 @@ use super::{network::put_to_server, profile::Profile};
 mod latency_graph {
     use std::time::{Duration, Instant};
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct LatencySample {
         pub timestamp: Instant,
         pub latency: Duration,
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct SerialEvent {
         pub timestamp: Instant,
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct LatencyGraphData {
         pub samples: Vec<LatencySample>,
         pub serial_events: Vec<SerialEvent>,
     }
 }
 
-enum WorkerEvent {
-    ErrorEvent(Box<dyn Error + Send>),
+#[derive(Debug, Clone)]
+pub enum WorkerEvent {
+    ErrorEvent(String),
     SerialEvent(SerialEvent),
     LatencySampleEvent(LatencySample, Option<String>),
 }
@@ -53,13 +54,13 @@ pub struct ActiveStream {
     serialized: Arc<Mutex<Option<serde_json::Value>>>,
     /// The latest payload the server is currently holding right now
     latest_payload: Option<String>,
-    errors: Vec<Box<dyn Error>>,
+    errors: Vec<String>,
 
     config: Profile,
 
     serial_join_handle: JoinHandle<()>,
     network_processing_join_handle: JoinHandle<()>,
-    worker_event_rx: Receiver<WorkerEvent>,
+    pub(crate) worker_event_rx: Arc<Mutex<Receiver<WorkerEvent>>>,
 }
 
 impl ActiveStream {
@@ -110,13 +111,13 @@ impl ActiveStream {
                                     .expect("worker event tx closed!");
                                 if let Err(err) = new_msg_tx.send(()) {
                                     worker_event_tx
-                                        .send(WorkerEvent::ErrorEvent(Box::new(err)))
+                                        .send(WorkerEvent::ErrorEvent(err.to_string()))
                                         .await
                                         .expect("worker event tx closed!")
                                 }
                             }
                             Err(err) => worker_event_tx
-                                .send(WorkerEvent::ErrorEvent(Box::new(err)))
+                                .send(WorkerEvent::ErrorEvent(err.to_string()))
                                 .await
                                 .expect("worker event tx closed!"),
                         },
@@ -124,7 +125,7 @@ impl ActiveStream {
                             // don't bother to update if nothing changed
                         }
                         Err(err) => worker_event_tx
-                            .send(WorkerEvent::ErrorEvent(Box::new(err)))
+                            .send(WorkerEvent::ErrorEvent(err.to_string()))
                             .await
                             .expect("worker event tx closed!"),
                     }
@@ -147,7 +148,7 @@ impl ActiveStream {
                 // pre-connect to the server
                 if let Err(err) = client.head(&data_stream_url).send().await {
                     worker_event_tx
-                        .send(WorkerEvent::ErrorEvent(Box::new(err)))
+                        .send(WorkerEvent::ErrorEvent(err.to_string()))
                         .await
                         .expect("worker event tx closed!")
                 }
@@ -173,7 +174,7 @@ impl ActiveStream {
                                         .await
                                         {
                                             Err(err) => worker_event_tx
-                                                .send(WorkerEvent::ErrorEvent(Box::new(err)))
+                                                .send(WorkerEvent::ErrorEvent(err.to_string()))
                                                 .await
                                                 .expect("worker event tx closed!"),
                                             Ok(latency) => worker_event_tx
@@ -197,7 +198,7 @@ impl ActiveStream {
                                     .await
                                     {
                                         Err(err) => worker_event_tx
-                                            .send(WorkerEvent::ErrorEvent(Box::new(err)))
+                                            .send(WorkerEvent::ErrorEvent(err.to_string()))
                                             .await
                                             .expect("worker event tx closed!"),
                                         Ok(latency) => worker_event_tx
@@ -214,7 +215,7 @@ impl ActiveStream {
                                 }
                             }
                             Err(err) => worker_event_tx
-                                .send(WorkerEvent::ErrorEvent(Box::new(err)))
+                                .send(WorkerEvent::ErrorEvent(err.to_string()))
                                 .await
                                 .expect("worker event tx closed!"),
                         }
@@ -249,27 +250,56 @@ impl ActiveStream {
             config,
             serial_join_handle,
             network_processing_join_handle,
-            worker_event_rx,
+            worker_event_rx: Arc::new(Mutex::new(worker_event_rx)),
         })
     }
 
     pub async fn update_stats(&mut self) {
-        while !self.worker_event_rx.is_empty() {
-            let event = self.worker_event_rx.recv().await;
-            if let Some(event) = event {
-                match event {
-                    WorkerEvent::ErrorEvent(err) => self.errors.push(err),
-                    WorkerEvent::LatencySampleEvent(sample, latest_payload) => {
-                        self.latest_payload = latest_payload;
-                        self.latency_graph_data.samples.push(sample)
-                    }
-                    WorkerEvent::SerialEvent(event) => {
-                        self.latency_graph_data.serial_events.push(event)
+        {
+            let mut rx = self.worker_event_rx.lock().await;
+            while !rx.is_empty() {
+                let event = rx.recv().await;
+                if let Some(event) = event {
+                    match event {
+                        WorkerEvent::ErrorEvent(err) => self.errors.push(err),
+                        WorkerEvent::LatencySampleEvent(sample, latest_payload) => {
+                            self.latest_payload = latest_payload;
+                            self.latency_graph_data.samples.push(sample)
+                        }
+                        WorkerEvent::SerialEvent(event) => {
+                            self.latency_graph_data.serial_events.push(event)
+                        }
                     }
                 }
             }
         }
         self.purge_old_latency_graph_data(Duration::from_secs(60 * 5))
+    }
+
+    pub fn update_from_events(&mut self, events: Vec<WorkerEvent>) {
+        for event in events {
+            match event {
+                WorkerEvent::ErrorEvent(err) => self.errors.push(err),
+                WorkerEvent::LatencySampleEvent(sample, latest_payload) => {
+                    self.latest_payload = latest_payload;
+                    self.latency_graph_data.samples.push(sample)
+                }
+                WorkerEvent::SerialEvent(event) => {
+                    self.latency_graph_data.serial_events.push(event)
+                }
+            }
+        }
+        self.purge_old_latency_graph_data(Duration::from_secs(60 * 5))
+    }
+
+    pub async fn read_events(&mut self, limit: usize) -> Vec<WorkerEvent> {
+        let mut buffer = Vec::new();
+        self.worker_event_rx
+            .lock()
+            .await
+            .recv_many(&mut buffer, limit)
+            .await;
+        buffer
     }
 
     pub fn latency_graph_data(&self) -> &LatencyGraphData {

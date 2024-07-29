@@ -9,7 +9,7 @@ use stream_start::stream_start;
 use utils::rounded_button;
 
 use crate::backend::profile::Profile;
-use crate::backend::stream::ActiveStream;
+use crate::backend::stream::{ActiveStream, WorkerEvent};
 
 #[derive(Debug, Default)]
 pub struct DaktronicsSingularUiApp {
@@ -28,6 +28,8 @@ pub enum Message {
     EndStream,
     SwitchScreen(HeaderScreen),
     ProfileNameChange(String),
+    UpdateStreamStats,
+    UpdateStreamStatsResponse(Vec<WorkerEvent>),
 }
 
 #[derive(Debug, Default)]
@@ -50,12 +52,14 @@ impl DaktronicsSingularUiApp {
             }
             Message::NewProfile => {
                 self.profile = Profile::default();
+                Task::none()
             }
             Message::WelcomeImportProfile => {
                 todo!()
             }
             Message::WelcomeNewProfile => {
                 self.screen = Screen::Configure;
+                Task::none()
             }
             Message::StartStream(tty_path) => match self.screen {
                 Screen::StreamStart(ref mut error) => {
@@ -67,20 +71,47 @@ impl DaktronicsSingularUiApp {
                         }
                         Err(err) => *error = Some(err.to_string()),
                     }
+                    Task::done(Message::UpdateStreamStats)
                 }
-                _ => {}
+                _ => Task::none(),
             },
             Message::EndStream => {
-                // Drop the stream, killing the background threads automatically
+                // Drop the stream, killing the background threads implicitly
                 self.screen = Screen::StreamStart(None);
+                Task::none()
             }
-            Message::ProfileNameChange(new_name) => self.profile.name = new_name,
+            Message::ProfileNameChange(new_name) => {
+                self.profile.name = new_name;
+                Task::none()
+            }
             Message::SwitchScreen(new_screen) => {
                 self.screen = match new_screen {
                     HeaderScreen::Configure => Screen::Configure,
                     HeaderScreen::Stream => Screen::StreamStart(None),
-                }
+                };
+                Task::none()
             }
+            Message::UpdateStreamStats => match self.screen {
+                Screen::Stream(ref mut active_stream) => {
+                    let rx = active_stream.worker_event_rx.clone();
+                    Task::perform(
+                        async move {
+                            let mut buffer = Vec::new();
+                            rx.lock().await.recv_many(&mut buffer, 16).await;
+                            buffer
+                        },
+                        Message::UpdateStreamStatsResponse,
+                    )
+                }
+                _ => Task::none(),
+            },
+            Message::UpdateStreamStatsResponse(events) => match self.screen {
+                Screen::Stream(ref mut active_stream) => {
+                    active_stream.update_from_events(events);
+                    Task::none()
+                }
+                _ => Task::none(),
+            },
         }
     }
 
