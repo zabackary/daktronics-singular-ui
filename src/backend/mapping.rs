@@ -178,12 +178,23 @@ impl Mapping {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MappingItem {
     pub enabled: bool,
     pub source_field: String,
     pub transformation: Transformation,
     pub destination_field: String,
+}
+
+impl Default for MappingItem {
+    fn default() -> Self {
+        MappingItem {
+            enabled: true,
+            source_field: Default::default(),
+            transformation: Default::default(),
+            destination_field: Default::default(),
+        }
+    }
 }
 
 impl MappingItem {
