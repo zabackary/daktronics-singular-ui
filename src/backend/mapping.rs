@@ -8,21 +8,43 @@ mod transformation {
 
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
     pub enum Transformation {
+        #[default]
+        None,
         TimeMinutes,
         TimeSeconds,
         TimeTenths,
         AppendOrdinalSuffix,
-        None,
+    }
+
+    impl Display for Transformation {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(match self {
+                Transformation::None => "No transformation",
+                Transformation::TimeMinutes => "Extract minutes from time",
+                Transformation::TimeSeconds => "Extract seconds from time",
+                Transformation::TimeTenths => "Extract tenths from time",
+                Transformation::AppendOrdinalSuffix => "Append ordinal suffix to number",
+            })
+        }
     }
 
     impl Transformation {
+        pub const ALL: [Transformation; 5] = [
+            Transformation::None,
+            Transformation::TimeMinutes,
+            Transformation::TimeSeconds,
+            Transformation::TimeTenths,
+            Transformation::AppendOrdinalSuffix,
+        ];
+
         pub fn transform(
             &self,
             value: &serde_json::Value,
         ) -> Result<serde_json::Value, TransformationError> {
             match self {
+                Transformation::None => Ok(value.clone()),
                 Transformation::TimeMinutes => {
                     let minute_seconds: Vec<_> = value
                         .as_str()
@@ -104,7 +126,6 @@ mod transformation {
                     });
                     Ok(serde_json::Value::String(s))
                 }
-                Transformation::None => Ok(value.clone()),
             }
         }
     }
@@ -157,7 +178,7 @@ impl Mapping {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MappingItem {
     pub enabled: bool,
     pub source_field: String,
