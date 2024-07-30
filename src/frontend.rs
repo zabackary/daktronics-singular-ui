@@ -66,8 +66,7 @@ impl DaktronicsSingularUiApp {
             }
             Message::StartStream(tty_path) => match self.screen {
                 Screen::StreamStart(ref mut error) => {
-                    self.profile.sport_type =
-                        Some(crate::backend::sports::DynamicSportType::Basketball);
+                    if self.profile.sport_type.is_some() {
                     match ActiveStream::new(self.profile.to_owned(), tty_path) {
                         Ok(stream) => {
                             self.screen = Screen::Stream(stream);
@@ -75,6 +74,12 @@ impl DaktronicsSingularUiApp {
                         Err(err) => *error = Some(err.to_string()),
                     }
                     Task::done(Message::UpdateStreamStats)
+                    } else {
+                        *error = Some(
+                            "You must set a sport type before beginning the stream.".to_owned(),
+                        );
+                        Task::none()
+                    }
                 }
                 _ => Task::none(),
             },

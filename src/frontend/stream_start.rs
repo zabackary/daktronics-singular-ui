@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use iced::{
-    widget::{column, component, container, pick_list, row, text, Component},
+    widget::{column, component, container, pick_list, row, svg, text, Component},
     Alignment, Border, Element, Length, Renderer, Shadow, Size, Theme,
 };
 use tokio_serial::SerialPortInfo;
@@ -155,18 +155,36 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                 .into(),
             ])
             .push_maybe(self.error.map(|error| {
-                container(text(error))
-                    .style(|theme: &iced::Theme| container::Style {
-                        background: None,
-                        text_color: None,
-                        shadow: Shadow::default(),
-                        border: Border {
-                            color: theme.palette().danger,
-                            width: 1.0,
-                            radius: 999.into(),
-                        },
-                    })
-                    .padding([4, 12])
+                container(
+                    row([
+                        container(
+                            svg(svg::Handle::from_memory(include_bytes!(
+                                "../../assets/icon_error.svg"
+                            )))
+                            .style(|theme: &Theme, _| svg::Style {
+                                color: Some(theme.palette().danger),
+                            })
+                            .content_fit(iced::ContentFit::Fill),
+                        )
+                        .width(24)
+                        .height(24)
+                        .into(),
+                        text(error).style(text::danger).into(),
+                    ])
+                    .align_items(Alignment::Center)
+                    .spacing(8),
+                )
+                .style(|theme: &iced::Theme| container::Style {
+                    background: None,
+                    text_color: None,
+                    shadow: Shadow::default(),
+                    border: Border {
+                        color: theme.palette().danger,
+                        width: 1.0,
+                        radius: 999.into(),
+                    },
+                })
+                .padding([8, 16])
             }))
             .spacing(16)
             .align_items(Alignment::Center),
