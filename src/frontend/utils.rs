@@ -89,7 +89,14 @@ pub fn rounded_pick_list_style(theme: &Theme, status: pick_list::Status) -> pick
     };
     match status {
         pick_list::Status::Active => active,
-        pick_list::Status::Hovered | pick_list::Status::Opened => pick_list::Style {
+        pick_list::Status::Hovered => pick_list::Style {
+            border: Border {
+                color: palette.background.base.text,
+                ..active.border
+            },
+            ..active
+        },
+        pick_list::Status::Opened => pick_list::Style {
             border: Border {
                 color: palette.primary.strong.color,
                 ..active.border
