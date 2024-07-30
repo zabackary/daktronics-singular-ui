@@ -1,8 +1,10 @@
+mod configure;
 mod header;
 mod stream_running;
 mod stream_start;
 mod utils;
 
+use configure::{configure, ConfigureEvent};
 use header::{header, HeaderScreen};
 use iced::widget::{column, container, row, text};
 use iced::{Alignment, Element, Length, Task};
@@ -33,6 +35,7 @@ pub enum Message {
     UpdateStreamStats,
     UpdateStreamStatsResponse(Vec<WorkerEvent>),
     ClearStreamErrors,
+    HandleConfigureEvent(ConfigureEvent),
 }
 
 #[derive(Debug, Default)]
@@ -67,13 +70,13 @@ impl DaktronicsSingularUiApp {
             Message::StartStream(tty_path) => match self.screen {
                 Screen::StreamStart(ref mut error) => {
                     if self.profile.sport_type.is_some() {
-                    match ActiveStream::new(self.profile.to_owned(), tty_path) {
-                        Ok(stream) => {
-                            self.screen = Screen::Stream(stream);
+                        match ActiveStream::new(self.profile.to_owned(), tty_path) {
+                            Ok(stream) => {
+                                self.screen = Screen::Stream(stream);
+                            }
+                            Err(err) => *error = Some(err.to_string()),
                         }
-                        Err(err) => *error = Some(err.to_string()),
-                    }
-                    Task::done(Message::UpdateStreamStats)
+                        Task::done(Message::UpdateStreamStats)
                     } else {
                         *error = Some(
                             "You must set a sport type before beginning the stream.".to_owned(),
@@ -127,6 +130,35 @@ impl DaktronicsSingularUiApp {
                 }
                 _ => Task::none(),
             },
+            Message::HandleConfigureEvent(event) => {
+                match event {
+                    ConfigureEvent::DataStreamUrlUpdated(new) => self.profile.data_stream_url = new,
+                    ConfigureEvent::SubcompNameUpdated(new) => self.profile.subcomp_name = new,
+                    ConfigureEvent::SportTypeUpdated(new) => self.profile.sport_type = Some(new),
+                    ConfigureEvent::MultipleRequestsUpdated(new) => {
+                        self.profile.multiple_requests = new
+                    }
+                    ConfigureEvent::MappingItemAdded => {
+                        self.profile.mapping.items.push(Default::default())
+                    }
+                    ConfigureEvent::MappingItemRemoved(i) => {
+                        self.profile.mapping.items.remove(i);
+                    }
+                    ConfigureEvent::MappingItemEnabledUpdated(i, new) => {
+                        self.profile.mapping.items[i].enabled = new
+                    }
+                    ConfigureEvent::MappingItemSourceFieldUpdated(i, new) => {
+                        self.profile.mapping.items[i].source_field = new
+                    }
+                    ConfigureEvent::MappingItemTransformationUpdated(i, new) => {
+                        self.profile.mapping.items[i].transformation = new
+                    }
+                    ConfigureEvent::MappingItemDestinationFieldUpdated(i, new) => {
+                        self.profile.mapping.items[i].destination_field = new
+                    }
+                };
+                Task::none()
+            }
         }
     }
 
@@ -193,7 +225,9 @@ impl DaktronicsSingularUiApp {
                 )
                 .into(),
                 match &self.screen {
-                    Screen::Configure => column([]).height(Length::Fill).width(Length::Fill).into(),
+                    Screen::Configure => {
+                        configure(&self.profile, Message::HandleConfigureEvent).into()
+                    }
                     Screen::Stream(active_stream) => {
                         stream_running(active_stream, Message::ClearStreamErrors).into()
                     }
