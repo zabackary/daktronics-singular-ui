@@ -1,7 +1,7 @@
 use iced::{
     border::Radius,
-    widget::{button, container, svg, tooltip, Button, Container, Tooltip},
-    Element, Renderer, Theme,
+    widget::{button, container, pick_list, svg, text_input, tooltip, Button, Container, Tooltip},
+    Border, Element, Renderer, Theme,
 };
 
 pub const BORDER_RADIUS: f32 = 8.0;
@@ -22,8 +22,14 @@ pub fn icon_button<'a, Message: Clone + 'a>(
     tooltip(
         button(
             svg(svg::Handle::from_memory(bytes))
-                .style(|theme: &Theme, _| svg::Style {
-                    color: Some(theme.palette().text),
+                .style(move |theme: &Theme, _| svg::Style {
+                    color: Some(match variant {
+                        RoundedButtonVariant::Danger => theme.extended_palette().danger.base.text,
+                        RoundedButtonVariant::Secondary => {
+                            theme.extended_palette().secondary.base.text
+                        }
+                        RoundedButtonVariant::Primary => theme.extended_palette().primary.base.text,
+                    }),
                 })
                 .content_fit(iced::ContentFit::Fill),
         )
@@ -66,4 +72,35 @@ pub fn rounded_pane<'a, Message>(child: impl Into<Element<'a, Message>>) -> Cont
         style.border.radius = BORDER_RADIUS.into();
         style
     })
+}
+
+pub fn rounded_pick_list_style(theme: &Theme, status: pick_list::Status) -> pick_list::Style {
+    let palette = theme.extended_palette();
+    let active = pick_list::Style {
+        background: palette.background.base.color.into(),
+        border: Border {
+            radius: BORDER_RADIUS.into(),
+            width: 1.0,
+            color: palette.background.strong.color,
+        },
+        handle_color: palette.background.weak.text,
+        placeholder_color: palette.background.strong.color,
+        text_color: palette.background.base.text,
+    };
+    match status {
+        pick_list::Status::Active => active,
+        pick_list::Status::Hovered | pick_list::Status::Opened => pick_list::Style {
+            border: Border {
+                color: palette.primary.strong.color,
+                ..active.border
+            },
+            ..active
+        },
+    }
+}
+
+pub fn rounded_text_input_style(theme: &Theme, status: text_input::Status) -> text_input::Style {
+    let mut style = text_input::default(theme, status);
+    style.border.radius = BORDER_RADIUS.into();
+    style
 }

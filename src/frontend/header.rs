@@ -1,13 +1,13 @@
 use iced::{
     border::Radius,
     widget::{
-        button, column, component, container, horizontal_rule, horizontal_space, row, text,
-        text_input, vertical_space, Component, Space,
+        button, column, component, container, horizontal_space, row, text, text_input,
+        vertical_space, Component, Space,
     },
     Border, Color, Element, Length, Renderer, Shadow, Size, Theme,
 };
 
-use super::utils::{icon_button, rounded_button, BORDER_RADIUS};
+use super::utils::{icon_button, rounded_button, rounded_text_input_style};
 
 #[derive(Debug, Clone)]
 pub enum HeaderScreen {
@@ -206,11 +206,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                     horizontal_space().into(),
                     {
                         let input = text_input("Profile name", self.profile_name)
-                            .style(|theme, status| {
-                                let mut style = text_input::default(theme, status);
-                                style.border.radius = Radius::from(BORDER_RADIUS);
-                                style
-                            })
+                            .style(rounded_text_input_style)
                             .padding(8)
                             .width(300);
                         if self.enabled {

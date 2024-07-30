@@ -6,7 +6,7 @@ use iced::{
 };
 use tokio_serial::SerialPortInfo;
 
-use super::utils::{icon_button, BORDER_RADIUS};
+use super::utils::{icon_button, rounded_pick_list_style};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SerialPortInfoWrapper(SerialPortInfo);
@@ -131,11 +131,7 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                     .placeholder("Serial port")
                     .padding(8)
                     .width(300)
-                    .style(|theme, status| {
-                        let mut style = pick_list::default(theme, status);
-                        style.border.radius = BORDER_RADIUS.into();
-                        style
-                    })
+                    .style(rounded_pick_list_style)
                     .into(),
                     icon_button(
                         include_bytes!("../../assets/icon_refresh.svg"),
