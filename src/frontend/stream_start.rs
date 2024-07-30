@@ -97,10 +97,10 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                 state
                     .selected_serial_port
                     .as_ref()
-                    .map(|x| x.0.port_name.as_str())
-                    .unwrap_or("") // TODO: fix validation below and remove this workaround after mock testing
-                    // .expect("tty port should be selected before StartStream callback is run")
-                    .to_owned(),
+                    .expect("tty port should be selected before StartStream callback is run")
+                    .0
+                    .port_name
+                    .clone(),
             )),
             StreamStartEvent::RefreshSerialPorts => {
                 state.serial_ports = enumerate_ports();
@@ -143,10 +143,10 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                     icon_button(
                         include_bytes!("../../assets/icon_play_circle.svg"),
                         "Start stream",
-                        Some(StreamStartEvent::StartStream), // TODO: actually select port
-                        // selected_serial_port
-                        //     .is_some()
-                        //     .then_some(Message::StartStream),
+                        state
+                            .selected_serial_port
+                            .is_some()
+                            .then_some(StreamStartEvent::StartStream),
                         super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),

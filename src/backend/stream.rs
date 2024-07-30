@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use daktronics_allsport_5000::{rtd_state, sports::Sport, RTDState};
+use daktronics_allsport_5000::{sports::Sport, RTDState};
 use latency_graph::{LatencyGraphData, LatencySample, SerialEvent};
 use tokio::{
     sync::{
@@ -15,7 +15,7 @@ use tokio::{
 };
 use tokio_serial::SerialPortBuilderExt;
 
-use crate::{mock::MockDataSource, APP_USER_AGENT};
+use crate::APP_USER_AGENT;
 
 use super::{network::put_to_server, profile::Profile};
 
@@ -65,13 +65,9 @@ pub enum WorkerEvent {
 #[derive(Debug)]
 pub struct ActiveStream {
     latency_graph_data: LatencyGraphData,
-    /// The payload about to undergo processing
-    serialized: Arc<Mutex<Option<serde_json::Value>>>,
     /// The latest payload the server is currently holding right now
     latest_payload: Option<String>,
     errors: Vec<ErrorInfo>,
-
-    config: Profile,
 
     serial_join_handle: JoinHandle<()>,
     network_processing_join_handle: JoinHandle<()>,
@@ -79,10 +75,10 @@ pub struct ActiveStream {
 }
 
 impl ActiveStream {
-    pub fn new(config: Profile, tty_path: String) -> Result<Self, Box<dyn Error>> {
+    pub fn new(profile: Profile, tty_path: String) -> Result<Self, Box<dyn Error>> {
         let (worker_event_tx, worker_event_rx) = mpsc::channel(255);
 
-        /*// allow because cargo gets suspicious on Windows
+        // allow because cargo gets suspicious on Windows
         #[allow(unused_mut)]
         let mut port = tokio_serial::new(tty_path, 19200)
             .parity(tokio_serial::Parity::None)
@@ -92,11 +88,10 @@ impl ActiveStream {
         port.set_exclusive(false)
             .expect("unable to set serial port exclusive to false");
 
-        let rtd_state = RTDState::from_serial_stream(port, true)?;*/
-        let rtd_state = RTDState::new(MockDataSource::new());
+        let rtd_state = RTDState::from_serial_stream(port, true)?;
 
         let serialized = Arc::new(Mutex::new(None));
-        let mut sport = config
+        let mut sport = profile
             .sport_type
             .ok_or("You must specify a sport before streaming.")?
             .as_dynamic_sport(rtd_state);
@@ -157,8 +152,8 @@ impl ActiveStream {
 
         let network_processing_join_handle = {
             let serialized = serialized.clone();
-            let data_stream_url = config.data_stream_url.clone();
-            let mapping = config.mapping.clone();
+            let data_stream_url = profile.data_stream_url.clone();
+            let mapping = profile.mapping.clone();
             let client = reqwest::Client::builder()
                 .user_agent(APP_USER_AGENT)
                 .http2_keep_alive_while_idle(true)
@@ -183,7 +178,7 @@ impl ActiveStream {
                             Ok(serialized) => {
                                 let pretty_stringified =
                                     serde_json::to_string_pretty(&serialized).ok();
-                                if config.multiple_requests {
+                                if profile.multiple_requests {
                                     let client = client.clone();
                                     let data_stream_url = data_stream_url.clone();
                                     let worker_event_tx = worker_event_tx.clone();
@@ -263,17 +258,8 @@ impl ActiveStream {
                 samples: vec![],
                 serial_events: vec![],
             },
-            serialized,
             latest_payload: None,
             errors: vec![],
-            // config: Config {
-            //     data_stream_url: "https://datastreams.singular.live/whatever".into(),
-            //     mapping: Mapping { items: vec![] },
-            //     multiple_requests: true,
-            //     sport: DynamicSport::Basketball,
-            //     subcomp_name: "Basketball Bug".into(),
-            // },
-            config,
             serial_join_handle,
             network_processing_join_handle,
             worker_event_rx: Arc::new(Mutex::new(worker_event_rx)),
