@@ -3,12 +3,12 @@ use std::{error::Error, fmt::Display};
 use serde::{Deserialize, Serialize};
 use transformation::{Transformation, TransformationError};
 
-mod transformation {
+pub mod transformation {
     use std::{error::Error, fmt::Display, num::ParseIntError};
 
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
     pub enum Transformation {
         #[default]
         None,
