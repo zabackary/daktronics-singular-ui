@@ -31,7 +31,7 @@ use daktronics_allsport_5000::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DynamicSportType {
     AutoRacing,
     Baseball,
