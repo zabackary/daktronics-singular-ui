@@ -141,15 +141,17 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                         include_bytes!("../../assets/icon_refresh.svg"),
                         "Refresh ports",
                         Some(StreamStartEvent::RefreshSerialPorts),
+                        super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),
                     icon_button(
                         include_bytes!("../../assets/icon_play_circle.svg"),
                         "Start stream",
                         Some(StreamStartEvent::StartStream), // TODO: actually select port
-                                                             // selected_serial_port
-                                                             //     .is_some()
-                                                             //     .then_some(Message::StartStream),
+                        // selected_serial_port
+                        //     .is_some()
+                        //     .then_some(Message::StartStream),
+                        super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),
                 ])

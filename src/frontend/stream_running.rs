@@ -132,6 +132,7 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                         include_bytes!("../../assets/icon_delete.svg"),
                         "Clear messages",
                         Some(StreamRunningEvent::ClearErrors),
+                        super::utils::RoundedButtonVariant::Secondary,
                     )),
                 ),
                 scrollable(

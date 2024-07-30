@@ -2,9 +2,9 @@ use iced::{
     border::Radius,
     widget::{
         button, column, component, container, horizontal_rule, horizontal_space, row, text,
-        text_input, Component, Space,
+        text_input, vertical_space, Component, Space,
     },
-    Border, Element, Length, Renderer, Shadow, Size, Theme,
+    Border, Color, Element, Length, Renderer, Shadow, Size, Theme,
 };
 
 use super::utils::{icon_button, rounded_button, BORDER_RADIUS};
@@ -101,6 +101,74 @@ impl Default for HeaderState {
     }
 }
 
+fn tab_button_style(
+    theme: &Theme,
+    status: button::Status,
+    radius: impl Into<Radius>,
+    selected: bool,
+) -> button::Style {
+    match status {
+        button::Status::Disabled | button::Status::Active => button::Style {
+            background: Some(
+                if selected {
+                    theme.extended_palette().primary.strong.color
+                } else {
+                    theme
+                        .extended_palette()
+                        .primary
+                        .strong
+                        .color
+                        .scale_alpha(0.3)
+                }
+                .into(),
+            ),
+            shadow: Shadow::default(),
+            text_color: theme.extended_palette().primary.strong.text,
+            border: Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: radius.into(),
+            },
+        },
+        button::Status::Hovered => button::Style {
+            background: Some(
+                theme
+                    .extended_palette()
+                    .primary
+                    .strong
+                    .color
+                    .scale_alpha(0.6)
+                    .into(),
+            ),
+            shadow: Shadow::default(),
+            text_color: theme.extended_palette().primary.strong.text,
+            border: Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: radius.into(),
+            },
+        },
+        button::Status::Pressed => button::Style {
+            background: Some(
+                theme
+                    .extended_palette()
+                    .primary
+                    .base
+                    .color
+                    .scale_alpha(0.8)
+                    .into(),
+            ),
+            shadow: Shadow::default(),
+            text_color: theme.extended_palette().primary.base.text,
+            border: Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: radius.into(),
+            },
+        },
+    }
+}
+
 impl<Message: Clone> Component<Message> for Header<'_, Message> {
     type State = HeaderState;
 
@@ -156,18 +224,21 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                         include_bytes!("../../assets/icon_download.svg"),
                         "Import profile",
                         self.enabled.then_some(HeaderEvent::ProfileImport),
+                        super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),
                     icon_button(
                         include_bytes!("../../assets/icon_upload.svg"),
                         "Export profile",
                         self.enabled.then_some(HeaderEvent::ProfileExport),
+                        super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),
                     icon_button(
                         include_bytes!("../../assets/icon_add_circle.svg"),
                         "New profile",
                         self.enabled.then_some(HeaderEvent::ProfileAdd),
+                        super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),
                 ])
@@ -179,14 +250,12 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                 row([container(row([
                     button(text("Configure"))
                         .style(|theme, status| {
-                            let mut style = if matches!(self.screen, HeaderScreen::Configure) {
-                                button::secondary(theme, status)
-                            } else {
-                                button::text(theme, status)
-                            };
-                            style.border.radius =
-                                Radius::from([BORDER_RADIUS, BORDER_RADIUS, 0.0, 0.0]);
-                            style
+                            tab_button_style(
+                                theme,
+                                status,
+                                [256.0, 0.0, 0.0, 256.0],
+                                matches!(self.screen, HeaderScreen::Configure),
+                            )
                         })
                         .padding([10, 14])
                         .on_press_maybe(
@@ -196,14 +265,12 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                         .into(),
                     button(text("Stream"))
                         .style(|theme, status| {
-                            let mut style = if matches!(self.screen, HeaderScreen::Stream) {
-                                button::secondary(theme, status)
-                            } else {
-                                button::text(theme, status)
-                            };
-                            style.border.radius =
-                                Radius::from([BORDER_RADIUS, BORDER_RADIUS, 0.0, 0.0]);
-                            style
+                            tab_button_style(
+                                theme,
+                                status,
+                                [0.0, 256.0, 256.0, 0.0],
+                                matches!(self.screen, HeaderScreen::Stream),
+                            )
                         })
                         .padding([10, 14])
                         .on_press_maybe(
@@ -239,7 +306,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                                 Space::new(0, 0).into(),
                                 rounded_button(
                                     "End stream",
-                                    super::utils::RoundedButtonVariant::Secondary,
+                                    super::utils::RoundedButtonVariant::Primary,
                                 )
                                 .on_press(HeaderEvent::OpenEndStreamConfirm)
                                 .into(),
@@ -261,7 +328,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                     .padding([4, 4, 4, 12])
                 }))
                 .into(),
-                horizontal_rule(2).into(),
+                vertical_space().height(8).into(),
             ])
             .width(Length::Fill),
         )
@@ -270,7 +337,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                 container::transparent(theme)
             } else {
                 container::transparent(theme)
-                    .with_background(theme.extended_palette().primary.weak.color.scale_alpha(0.2))
+                    .with_background(theme.extended_palette().primary.weak.color.scale_alpha(0.8))
             }
         })
         .into()
