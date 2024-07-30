@@ -1,6 +1,6 @@
 use iced::{
     border::Radius,
-    widget::{button, container, svg, tooltip, Button, Tooltip},
+    widget::{button, container, svg, tooltip, Button, Container, Tooltip},
     Element, Renderer, Theme,
 };
 
@@ -60,5 +60,13 @@ pub fn rounded_button<'a, Message>(
             style.border.radius = 999.into();
             style
         }
+    })
+}
+
+pub fn rounded_pane<'a, Message>(child: impl Into<Element<'a, Message>>) -> Container<'a, Message> {
+    container(child).style(|theme| {
+        let mut style = container::rounded_box(theme);
+        style.border.radius = BORDER_RADIUS.into();
+        style
     })
 }

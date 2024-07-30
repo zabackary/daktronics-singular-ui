@@ -41,8 +41,23 @@ mod latency_graph {
 }
 
 #[derive(Debug, Clone)]
+pub struct ErrorInfo {
+    pub msg: String,
+    pub timestamp: Instant,
+}
+
+impl From<String> for ErrorInfo {
+    fn from(value: String) -> Self {
+        ErrorInfo {
+            msg: value,
+            timestamp: Instant::now(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum WorkerEvent {
-    ErrorEvent(String),
+    ErrorEvent(ErrorInfo),
     SerialEvent(SerialEvent),
     LatencySampleEvent(LatencySample, Option<String>),
 }
@@ -54,7 +69,7 @@ pub struct ActiveStream {
     serialized: Arc<Mutex<Option<serde_json::Value>>>,
     /// The latest payload the server is currently holding right now
     latest_payload: Option<String>,
-    errors: Vec<String>,
+    errors: Vec<ErrorInfo>,
 
     config: Profile,
 
@@ -111,13 +126,17 @@ impl ActiveStream {
                                     .expect("worker event tx closed!");
                                 if let Err(err) = new_msg_tx.send(()) {
                                     worker_event_tx
-                                        .send(WorkerEvent::ErrorEvent(err.to_string()))
+                                        .send(WorkerEvent::ErrorEvent(
+                                            format!("failed to write to new_msg_tx: {err}").into(),
+                                        ))
                                         .await
                                         .expect("worker event tx closed!")
                                 }
                             }
                             Err(err) => worker_event_tx
-                                .send(WorkerEvent::ErrorEvent(err.to_string()))
+                                .send(WorkerEvent::ErrorEvent(
+                                    format!("couldn't serialize sport: {err}").into(),
+                                ))
                                 .await
                                 .expect("worker event tx closed!"),
                         },
@@ -125,7 +144,9 @@ impl ActiveStream {
                             // don't bother to update if nothing changed
                         }
                         Err(err) => worker_event_tx
-                            .send(WorkerEvent::ErrorEvent(err.to_string()))
+                            .send(WorkerEvent::ErrorEvent(
+                                format!("failed to update RTD state: {err}").into(),
+                            ))
                             .await
                             .expect("worker event tx closed!"),
                     }
@@ -148,7 +169,9 @@ impl ActiveStream {
                 // pre-connect to the server
                 if let Err(err) = client.head(&data_stream_url).send().await {
                     worker_event_tx
-                        .send(WorkerEvent::ErrorEvent(err.to_string()))
+                        .send(WorkerEvent::ErrorEvent(
+                            format!("server pre-connect failed: {err:?}").into(),
+                        ))
                         .await
                         .expect("worker event tx closed!")
                 }
@@ -174,7 +197,7 @@ impl ActiveStream {
                                         .await
                                         {
                                             Err(err) => worker_event_tx
-                                                .send(WorkerEvent::ErrorEvent(err.to_string()))
+                                                .send(WorkerEvent::ErrorEvent(format!("server PUT failed (multiple_requests=true): {err:?}").into()))
                                                 .await
                                                 .expect("worker event tx closed!"),
                                             Ok(latency) => worker_event_tx
@@ -198,7 +221,7 @@ impl ActiveStream {
                                     .await
                                     {
                                         Err(err) => worker_event_tx
-                                            .send(WorkerEvent::ErrorEvent(err.to_string()))
+                                            .send(WorkerEvent::ErrorEvent(format!("server PUT failed (multiple_requests=false): {err:?}").into()))
                                             .await
                                             .expect("worker event tx closed!"),
                                         Ok(latency) => worker_event_tx
@@ -215,7 +238,10 @@ impl ActiveStream {
                                 }
                             }
                             Err(err) => worker_event_tx
-                                .send(WorkerEvent::ErrorEvent(err.to_string()))
+                                .send(WorkerEvent::ErrorEvent(
+                                    format!("failed to map from serial stream to network: {err}")
+                                        .into(),
+                                ))
                                 .await
                                 .expect("worker event tx closed!"),
                         }
@@ -273,7 +299,7 @@ impl ActiveStream {
                 }
             }
         }
-        self.purge_old_latency_graph_data(Duration::from_secs(60 * 5))
+        self.purge_old_data(Duration::from_secs(60 * 5), 20)
     }
 
     pub fn update_from_events(&mut self, events: Vec<WorkerEvent>) {
@@ -289,7 +315,7 @@ impl ActiveStream {
                 }
             }
         }
-        self.purge_old_latency_graph_data(Duration::from_secs(60 * 5))
+        self.purge_old_data(Duration::from_secs(60 * 5), 20)
     }
 
     pub async fn read_events(&mut self, limit: usize) -> Vec<WorkerEvent> {
@@ -310,14 +336,25 @@ impl ActiveStream {
         self.latest_payload.as_ref().map(String::as_str)
     }
 
+    pub fn errors(&self) -> &[ErrorInfo] {
+        &self.errors
+    }
+
+    pub fn clear_errors(&mut self) {
+        self.errors.clear()
+    }
+
     /// Deletes all latency graph data with ages more than the specific duration
-    pub fn purge_old_latency_graph_data(&mut self, keep: Duration) {
+    pub fn purge_old_data(&mut self, keep_graph: Duration, keep_errors: usize) {
         self.latency_graph_data
             .samples
-            .retain(|x| x.timestamp.elapsed() < keep);
+            .retain(|x| x.timestamp.elapsed() < keep_graph);
         self.latency_graph_data
             .serial_events
-            .retain(|x| x.timestamp.elapsed() < keep);
+            .retain(|x| x.timestamp.elapsed() < keep_graph);
+        self.errors = self
+            .errors
+            .split_off(self.errors.len().saturating_sub(keep_errors));
     }
 }
 

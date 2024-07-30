@@ -1,10 +1,12 @@
 mod header;
+mod stream_running;
 mod stream_start;
 mod utils;
 
 use header::{header, HeaderScreen};
 use iced::widget::{column, container, row, text};
 use iced::{Alignment, Element, Length, Task};
+use stream_running::stream_running;
 use stream_start::stream_start;
 use utils::rounded_button;
 
@@ -30,6 +32,7 @@ pub enum Message {
     ProfileNameChange(String),
     UpdateStreamStats,
     UpdateStreamStatsResponse(Vec<WorkerEvent>),
+    ClearStreamErrors,
 }
 
 #[derive(Debug, Default)]
@@ -108,6 +111,13 @@ impl DaktronicsSingularUiApp {
             Message::UpdateStreamStatsResponse(events) => match self.screen {
                 Screen::Stream(ref mut active_stream) => {
                     active_stream.update_from_events(events);
+                    Task::done(Message::UpdateStreamStats)
+                }
+                _ => Task::none(),
+            },
+            Message::ClearStreamErrors => match self.screen {
+                Screen::Stream(ref mut active_stream) => {
+                    active_stream.clear_errors();
                     Task::none()
                 }
                 _ => Task::none(),
@@ -179,8 +189,8 @@ impl DaktronicsSingularUiApp {
                 .into(),
                 match &self.screen {
                     Screen::Configure => column([]).height(Length::Fill).width(Length::Fill).into(),
-                    Screen::Stream(_active_stream) => {
-                        container(text("latency")).center(Length::Fill).into()
+                    Screen::Stream(active_stream) => {
+                        stream_running(active_stream, Message::ClearStreamErrors).into()
                     }
                     Screen::StreamStart(error) => {
                         stream_start(Message::StartStream, error.as_deref()).into()
