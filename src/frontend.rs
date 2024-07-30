@@ -4,16 +4,21 @@ mod stream_running;
 mod stream_start;
 mod utils;
 
+use std::path::PathBuf;
+
 use configure::{configure, ConfigureEvent};
 use header::{header, HeaderScreen};
 use iced::widget::{column, container, row, text};
 use iced::{Alignment, Element, Length, Task};
 use stream_running::stream_running;
 use stream_start::stream_start;
+use tokio::fs;
+use tokio::io::AsyncReadExt;
 use utils::rounded_button;
 
 use crate::backend::profile::Profile;
 use crate::backend::stream::{ActiveStream, WorkerEvent};
+use crate::DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION;
 
 #[derive(Debug, Default)]
 pub struct DaktronicsSingularUiApp {
@@ -23,9 +28,12 @@ pub struct DaktronicsSingularUiApp {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    NoOp,
     NewProfile,
     ImportProfile,
+    ImportProfileFinished(Result<Option<Profile>, String>),
     ExportProfile,
+    ExportProfileFinished(Result<Option<PathBuf>, String>),
     WelcomeNewProfile,
     WelcomeImportProfile,
     StartStream(String),
@@ -50,18 +58,147 @@ enum Screen {
 impl DaktronicsSingularUiApp {
     pub fn update(&mut self, message: Message) -> impl Into<Task<Message>> {
         match message {
+            Message::NoOp => Task::none(),
             Message::ExportProfile => {
-                todo!()
+                let profile_name = self.profile.name.clone();
+                let result = serde_json::to_string(&self.profile);
+                Task::perform(
+                    async move {
+                        match result {
+                            Ok(serialized) => {
+                                if let Some(location) = tokio::task::spawn_blocking(move || {
+                                    native_dialog::FileDialog::new()
+                                        .set_title("Save profile as")
+                                        .add_filter(
+                                            "Daktronics Singular UI Profile",
+                                            &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
+                                        )
+                                        .set_filename(&format!(
+                                            "{}.dsu",
+                                            filenamify::filenamify(profile_name)
+                                        ))
+                                        .show_save_single_file()
+                                        .expect("failed to show save file picker")
+                                })
+                                .await
+                                .expect("failed to join dialog task")
+                                {
+                                    fs::write(&location, serialized)
+                                        .await
+                                        .map(|_| Some(location))
+                                        .map_err(|err| err.to_string())
+                                } else {
+                                    Ok(None)
+                                }
+                            }
+                            Err(err) => {
+                                tokio::task::spawn_blocking(move || {
+                                    native_dialog::MessageDialog::new()
+                                        .set_type(native_dialog::MessageType::Error)
+                                        .set_title("Failed to export")
+                                        .set_text(&err.to_string())
+                                        .show_alert()
+                                        .expect("failed to show failed dialog")
+                                })
+                                .await
+                                .expect("failed to join dialog task");
+                                Ok(None)
+                            }
+                        }
+                    },
+                    Message::ExportProfileFinished,
+                )
             }
-            Message::ImportProfile => {
-                todo!()
+            Message::ExportProfileFinished(result) => {
+                let profile_name = self.profile.name.clone();
+                Task::perform(
+                    async move {
+                        tokio::task::spawn_blocking(move || match result {
+                            Ok(Some(location)) => {
+                                native_dialog::MessageDialog::new()
+                                    .set_title("Finished export")
+                                    .set_text(&format!(
+                                        "Finished exporting the profile \"{}\" to {}",
+                                        profile_name,
+                                        location.display()
+                                    ))
+                                    .show_alert()
+                                    .expect("failed to show finished dialog");
+                            }
+                            Ok(None) => {}
+                            Err(err) => {
+                                native_dialog::MessageDialog::new()
+                                    .set_type(native_dialog::MessageType::Error)
+                                    .set_title("Failed to export")
+                                    .set_text(&err.to_string())
+                                    .show_alert()
+                                    .expect("failed to show failed dialog");
+                            }
+                        })
+                        .await
+                        .expect("failed to join dialog task");
+                    },
+                    |_| Message::NoOp,
+                )
             }
+            Message::ImportProfile => Task::perform(
+                async move {
+                    if let Some(path) = tokio::task::spawn_blocking(move || {
+                        native_dialog::FileDialog::new()
+                            .set_title("Open profile")
+                            .add_filter(
+                                "Daktronics Singular UI Profile",
+                                &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
+                            )
+                            .show_open_single_file()
+                            .expect("failed to show open file picker")
+                    })
+                    .await
+                    .expect("failed to join dialog task")
+                    {
+                        let mut file = fs::File::open(path).await.map_err(|err| err.to_string())?;
+                        let mut buffer = String::new();
+                        file.read_to_string(&mut buffer)
+                            .await
+                            .map_err(|err| err.to_string())?;
+                        serde_json::from_str(&buffer)
+                            .map_err(|err| err.to_string())
+                            .map(Some)
+                    } else {
+                        Ok(None)
+                    }
+                },
+                Message::ImportProfileFinished,
+            ),
+            Message::ImportProfileFinished(result) => match result {
+                Ok(Some(profile)) => {
+                    self.profile = profile;
+                    Task::none()
+                }
+                Ok(None) => Task::none(),
+                Err(err) => Task::perform(
+                    async {
+                        tokio::task::spawn_blocking(move || {
+                            native_dialog::MessageDialog::new()
+                                .set_type(native_dialog::MessageType::Error)
+                                .set_title("Failed to export")
+                                .set_text(&err.to_string())
+                                .show_alert()
+                                .expect("failed to show failed dialog");
+                        })
+                        .await
+                        .expect("could not join dialog task");
+                    },
+                    |_| Message::NoOp,
+                ),
+            },
             Message::NewProfile => {
                 self.profile = Profile::default();
                 Task::none()
             }
             Message::WelcomeImportProfile => {
-                todo!()
+                self.screen = Screen::Configure;
+                Task::done(Message::ImportProfile)
             }
             Message::WelcomeNewProfile => {
                 self.screen = Screen::Configure;
