@@ -27,7 +27,11 @@ impl Display for SerialPortInfoWrapper {
                     .map(String::as_ref)
                     .unwrap_or("unknown product")
             ),
-            _ => write!(f, "{}", self.0.port_name),
+            tokio_serial::SerialPortType::BluetoothPort => {
+                write!(f, "{} (via Bluetooth)", self.0.port_name)
+            }
+            tokio_serial::SerialPortType::PciPort => write!(f, "{} (via PCI)", self.0.port_name),
+            tokio_serial::SerialPortType::Unknown => write!(f, "{}", self.0.port_name),
         }
     }
 }
