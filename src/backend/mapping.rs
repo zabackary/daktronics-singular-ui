@@ -16,6 +16,9 @@ pub mod transformation {
         TimeSeconds,
         TimeTenths,
         AppendOrdinalSuffix,
+        AssertString,
+        AssertNumber,
+        AssertBoolean,
     }
 
     impl Display for Transformation {
@@ -26,17 +29,23 @@ pub mod transformation {
                 Transformation::TimeSeconds => "Extract seconds from time",
                 Transformation::TimeTenths => "Extract tenths from time",
                 Transformation::AppendOrdinalSuffix => "Append ordinal suffix to number",
+                Transformation::AssertString => "Assert string",
+                Transformation::AssertNumber => "Assert number",
+                Transformation::AssertBoolean => "Assert boolean",
             })
         }
     }
 
     impl Transformation {
-        pub const ALL: [Transformation; 5] = [
+        pub const ALL: [Transformation; 8] = [
             Transformation::None,
             Transformation::TimeMinutes,
             Transformation::TimeSeconds,
             Transformation::TimeTenths,
             Transformation::AppendOrdinalSuffix,
+            Transformation::AssertString,
+            Transformation::AssertNumber,
+            Transformation::AssertBoolean,
         ];
 
         pub fn transform(
@@ -44,7 +53,13 @@ pub mod transformation {
             value: &serde_json::Value,
         ) -> Result<serde_json::Value, TransformationError> {
             match self {
-                Transformation::None => Ok(value.clone()),
+                Transformation::None => {
+                    if value.is_null() {
+                        return Err(TransformationError::UnexpectedSourceType(value.clone()));
+                    } else {
+                        return Ok(value.clone());
+                    }
+                }
                 Transformation::TimeMinutes => {
                     let minute_seconds: Vec<_> = value
                         .as_str()
@@ -126,6 +141,27 @@ pub mod transformation {
                     });
                     Ok(serde_json::Value::String(s))
                 }
+                Transformation::AssertString => {
+                    if !value.is_string() {
+                        return Err(TransformationError::UnexpectedSourceType(value.clone()));
+                    } else {
+                        return Ok(value.clone());
+                    }
+                }
+                Transformation::AssertNumber => {
+                    if !value.is_number() {
+                        return Err(TransformationError::UnexpectedSourceType(value.clone()));
+                    } else {
+                        return Ok(value.clone());
+                    }
+                }
+                Transformation::AssertBoolean => {
+                    if !value.is_boolean() {
+                        return Err(TransformationError::UnexpectedSourceType(value.clone()));
+                    } else {
+                        return Ok(value.clone());
+                    }
+                }
             }
         }
     }
@@ -167,12 +203,30 @@ pub struct Mapping {
 }
 
 impl Mapping {
-    pub fn map(&self, source: &serde_json::Value) -> Result<serde_json::Value, MapError> {
+    pub fn map(
+        &self,
+        source: &serde_json::Value,
+        exclude_incomplete_data: bool,
+    ) -> Result<serde_json::Value, MapError> {
         let source_map = source.as_object().ok_or(MapError::SourceNotMap)?;
         // map could be underfilled if fields are disabled, but that's okay
         let mut destination = serde_json::Map::with_capacity(self.items.len());
         for item in &self.items {
-            item.map(source_map, &mut destination)?;
+            match item.map(source_map, &mut destination) {
+                Ok(_) => (),
+                Err(MapError::Transformation(
+                    destination_field,
+                    TransformationError::UnexpectedSourceType(serde_json::Value::Null),
+                )) => {
+                    if !exclude_incomplete_data {
+                        return Err(MapError::Transformation(
+                            destination_field,
+                            TransformationError::UnexpectedSourceType(serde_json::Value::Null),
+                        ));
+                    }
+                }
+                Err(err) => return Err(err),
+            }
         }
         Ok(serde_json::Value::Object(destination))
     }
@@ -210,7 +264,7 @@ impl MappingItem {
             let transformed = self
                 .transformation
                 .transform(source_value)
-                .map_err(MapError::Transformation)?;
+                .map_err(|x| MapError::Transformation(self.destination_field.clone(), x))?;
             let previous_value = destination.insert(self.destination_field.clone(), transformed);
             if let Some(_) = previous_value {
                 Err(MapError::DestinationFieldAlreadyPresent(
@@ -230,7 +284,7 @@ pub enum MapError {
     SourceNotMap,
     SourceFieldNonExistent(String),
     DestinationFieldAlreadyPresent(String),
-    Transformation(TransformationError),
+    Transformation(String, TransformationError),
 }
 
 impl Display for MapError {
@@ -243,7 +297,11 @@ impl Display for MapError {
             MapError::DestinationFieldAlreadyPresent(field) => {
                 write!(f, "destination field {} is already present in the output; maybe there's a duplicate?", field)
             }
-            MapError::Transformation(err) => write!(f, "transformation error: {}", err),
+            MapError::Transformation(attempted_destination_field, err) => write!(
+                f,
+                "transformation error for destination field {}: {}",
+                attempted_destination_field, err
+            ),
         }
     }
 }

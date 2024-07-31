@@ -174,7 +174,7 @@ impl ActiveStream {
                 loop {
                     let serialized = { serialized.lock().await.take() };
                     if let Some(value) = serialized {
-                        match mapping.map(&value) {
+                        match mapping.map(&value, profile.exclude_incomplete_data) {
                             Ok(serialized) => {
                                 let pretty_stringified =
                                     serde_json::to_string_pretty(&serialized).ok();

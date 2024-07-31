@@ -275,6 +275,9 @@ impl DaktronicsSingularUiApp {
                     ConfigureEvent::MultipleRequestsUpdated(new) => {
                         self.profile.multiple_requests = new
                     }
+                    ConfigureEvent::ExcludeIncompleteDataUpdated(new) => {
+                        self.profile.exclude_incomplete_data = new
+                    }
                     ConfigureEvent::MappingItemAdded => {
                         self.profile.mapping.items.push(Default::default())
                     }

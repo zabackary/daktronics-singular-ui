@@ -37,6 +37,7 @@ pub enum ConfigureEvent {
     SubcompNameUpdated(String),
     SportTypeUpdated(DynamicSportType),
     MultipleRequestsUpdated(bool),
+    ExcludeIncompleteDataUpdated(bool),
     MappingItemAdded,
     MappingItemRemoved(usize),
     MappingItemEnabledUpdated(usize, bool),
@@ -119,11 +120,12 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                 ])
                 .spacing(8)
                 .into(),
-                row([
-                    checkbox("Allow concurrent updates to the server", self.profile.multiple_requests)
+                checkbox("Allow concurrent updates to the server", self.profile.multiple_requests)
                     .on_toggle(ConfigureEvent::MultipleRequestsUpdated)
-                    .into()
-                ]).into(),
+                    .into(),
+                checkbox("Exclude incomplete data from payload instead of erroring", self.profile.exclude_incomplete_data)
+                    .on_toggle(ConfigureEvent::ExcludeIncompleteDataUpdated)
+                    .into(),
                 horizontal_rule(2.0).into(),
                 column(self.profile.mapping.items.iter().enumerate().map(|(i, item)| {
                     row([
