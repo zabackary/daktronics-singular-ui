@@ -101,7 +101,7 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                 pane_header(
                     "Latest payload",
                     payload
-                        .map(|x| x.len().try_into().unwrap_or(i32::MAX))
+                        .map(|x| x.as_bytes().len().try_into().unwrap_or(i32::MAX))
                         .unwrap_or(0),
                     "B",
                     // not sure why Rust needs annotations but whatever
@@ -112,7 +112,8 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                         text(self.active_stream.latest_payload().unwrap_or("No data"))
                             .font(Font::MONOSPACE),
                     )
-                    .padding(8),
+                    .width(Length::Fill)
+                    .padding(16),
                 ))
                 .fill()
                 .into(),
@@ -145,6 +146,7 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                                 text(&error.msg).font(Font::MONOSPACE).into(),
                             ])
                             .padding(8)
+                            .width(Length::Fill)
                             .spacing(4),
                         )
                         .into()
