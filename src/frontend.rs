@@ -20,10 +20,25 @@ use crate::backend::profile::Profile;
 use crate::backend::stream::{ActiveStream, WorkerEvent};
 use crate::DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DaktronicsSingularUiApp {
     screen: Screen,
     profile: Profile,
+    pub(super) dark_mode: bool,
+}
+
+fn use_dark_mode() -> bool {
+    matches!(dark_light::detect(), dark_light::Mode::Dark)
+}
+
+impl Default for DaktronicsSingularUiApp {
+    fn default() -> Self {
+        DaktronicsSingularUiApp {
+            screen: Default::default(),
+            profile: Default::default(),
+            dark_mode: use_dark_mode(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

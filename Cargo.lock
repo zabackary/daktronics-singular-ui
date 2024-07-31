@@ -794,6 +794,7 @@ name = "daktronics-singular-ui"
 version = "0.1.0"
 dependencies = [
  "daktronics-allsport-5000",
+ "dark-light",
  "filenamify",
  "iced",
  "reqwest",

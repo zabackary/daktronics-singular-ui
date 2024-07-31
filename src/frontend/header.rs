@@ -111,19 +111,18 @@ fn tab_button_style(
         button::Status::Disabled | button::Status::Active => button::Style {
             background: Some(
                 if selected {
-                    theme.extended_palette().primary.strong.color
+                    theme.extended_palette().primary.base.color
                 } else {
-                    theme
-                        .extended_palette()
-                        .primary
-                        .strong
-                        .color
-                        .scale_alpha(0.3)
+                    theme.extended_palette().primary.weak.color
                 }
                 .into(),
             ),
             shadow: Shadow::default(),
-            text_color: theme.extended_palette().primary.strong.text,
+            text_color: if selected {
+                theme.extended_palette().primary.base.text
+            } else {
+                theme.extended_palette().primary.weak.text
+            },
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
@@ -137,7 +136,7 @@ fn tab_button_style(
                     .primary
                     .strong
                     .color
-                    .scale_alpha(0.6)
+                    .scale_alpha(0.8)
                     .into(),
             ),
             shadow: Shadow::default(),
@@ -333,7 +332,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                 container::transparent(theme)
             } else {
                 container::transparent(theme)
-                    .with_background(theme.extended_palette().primary.weak.color.scale_alpha(0.8))
+                    .with_background(theme.extended_palette().primary.weak.color.scale_alpha(0.2))
             }
         })
         .into()
