@@ -76,6 +76,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                             "https://datastream.singular.live/datastreams/ABCDEFGHIJKLMNOPQRSTUVWXYZ",
                             &self.profile.data_stream_url,
                         )
+                        .width(Length::Fill)
                         .padding(8)
                         .on_input(ConfigureEvent::DataStreamUrlUpdated)
                         .style(rounded_text_input_style)
@@ -94,6 +95,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                             self.profile.sport_type.as_ref(),
                             ConfigureEvent::SportTypeUpdated,
                         )
+                        .width(Length::Fill)
                         .padding(8)
                         .style(rounded_pick_list_style)
                         .into(),
@@ -110,6 +112,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                             "Score Bug",
                             &self.profile.subcomp_name,
                         )
+                        .width(Length::Fill)
                         .padding(8)
                         .on_input(ConfigureEvent::SubcompNameUpdated)
                         .style(rounded_text_input_style)
@@ -160,6 +163,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                             "Source field",
                             &item.source_field
                         )
+                        .width(Length::Fill)
                         .padding(8)
                         .on_input(move |new| ConfigureEvent::MappingItemSourceFieldUpdated(i, new))
                         .style(rounded_text_input_style)
@@ -169,6 +173,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                             Some(item.transformation),
                             move |new| ConfigureEvent::MappingItemTransformationUpdated(i, new)
                         )
+                        .width(Length::Fill)
                         .padding(8)
                         .style(rounded_pick_list_style)
                         .into(),
@@ -176,6 +181,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                             "Destination field",
                             &item.destination_field
                         )
+                        .width(Length::Fill)
                         .padding(8)
                         .on_input(move |new| ConfigureEvent::MappingItemDestinationFieldUpdated(i, new))
                         .style(rounded_text_input_style)
