@@ -66,42 +66,34 @@ impl DaktronicsSingularUiApp {
                     async move {
                         match result {
                             Ok(serialized) => {
-                                if let Some(location) = tokio::task::spawn_blocking(move || {
-                                    native_dialog::FileDialog::new()
-                                        .set_title("Save profile as")
-                                        .add_filter(
-                                            "Daktronics Singular UI Profile",
-                                            &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
-                                        )
-                                        .set_filename(&format!(
-                                            "{}.dsu",
-                                            filenamify::filenamify(profile_name)
-                                        ))
-                                        .show_save_single_file()
-                                        .expect("failed to show save file picker")
-                                })
-                                .await
-                                .expect("failed to join dialog task")
+                                if let Some(location) = rfd::AsyncFileDialog::new()
+                                    .set_title("Save profile as")
+                                    .add_filter(
+                                        "Daktronics Singular UI Profile",
+                                        &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
+                                    )
+                                    .set_file_name(&format!(
+                                        "{}.dsu",
+                                        filenamify::filenamify(profile_name)
+                                    ))
+                                    .save_file()
+                                    .await
                                 {
-                                    fs::write(&location, serialized)
+                                    fs::write(location.path(), serialized)
                                         .await
-                                        .map(|_| Some(location))
+                                        .map(|_| Some(location.path().to_path_buf()))
                                         .map_err(|err| err.to_string())
                                 } else {
                                     Ok(None)
                                 }
                             }
                             Err(err) => {
-                                tokio::task::spawn_blocking(move || {
-                                    native_dialog::MessageDialog::new()
-                                        .set_type(native_dialog::MessageType::Error)
-                                        .set_title("Failed to export")
-                                        .set_text(&err.to_string())
-                                        .show_alert()
-                                        .expect("failed to show failed dialog")
-                                })
-                                .await
-                                .expect("failed to join dialog task");
+                                rfd::AsyncMessageDialog::new()
+                                    .set_level(rfd::MessageLevel::Error)
+                                    .set_title("Failed to export profile")
+                                    .set_description(err.to_string())
+                                    .show()
+                                    .await;
                                 Ok(None)
                             }
                         }
@@ -113,50 +105,47 @@ impl DaktronicsSingularUiApp {
                 let profile_name = self.profile.name.clone();
                 Task::perform(
                     async move {
-                        tokio::task::spawn_blocking(move || match result {
+                        match result {
                             Ok(Some(location)) => {
-                                native_dialog::MessageDialog::new()
+                                rfd::AsyncMessageDialog::new()
                                     .set_title("Finished export")
-                                    .set_text(&format!(
+                                    .set_description(&format!(
                                         "Finished exporting the profile \"{}\" to {}",
                                         profile_name,
                                         location.display()
                                     ))
-                                    .show_alert()
-                                    .expect("failed to show finished dialog");
+                                    .set_level(rfd::MessageLevel::Info)
+                                    .show()
+                                    .await;
                             }
                             Ok(None) => {}
                             Err(err) => {
-                                native_dialog::MessageDialog::new()
-                                    .set_type(native_dialog::MessageType::Error)
-                                    .set_title("Failed to export")
-                                    .set_text(&err.to_string())
-                                    .show_alert()
-                                    .expect("failed to show failed dialog");
+                                rfd::AsyncMessageDialog::new()
+                                    .set_level(rfd::MessageLevel::Error)
+                                    .set_title("Failed to export profile")
+                                    .set_description(err.to_string())
+                                    .show()
+                                    .await;
                             }
-                        })
-                        .await
-                        .expect("failed to join dialog task");
+                        }
                     },
                     |_| Message::NoOp,
                 )
             }
             Message::ImportProfile => Task::perform(
                 async move {
-                    if let Some(path) = tokio::task::spawn_blocking(move || {
-                        native_dialog::FileDialog::new()
-                            .set_title("Open profile")
-                            .add_filter(
-                                "Daktronics Singular UI Profile",
-                                &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
-                            )
-                            .show_open_single_file()
-                            .expect("failed to show open file picker")
-                    })
-                    .await
-                    .expect("failed to join dialog task")
+                    if let Some(path) = rfd::AsyncFileDialog::new()
+                        .set_title("Open profile")
+                        .add_filter(
+                            "Daktronics Singular UI Profile",
+                            &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
+                        )
+                        .pick_file()
+                        .await
                     {
-                        let mut file = fs::File::open(path).await.map_err(|err| err.to_string())?;
+                        let mut file = fs::File::open(path.path())
+                            .await
+                            .map_err(|err| err.to_string())?;
                         let mut buffer = String::new();
                         file.read_to_string(&mut buffer)
                             .await
@@ -170,36 +159,34 @@ impl DaktronicsSingularUiApp {
                 },
                 Message::ImportProfileFinished,
             ),
-            Message::ImportProfileFinished(result) => match result {
-                Ok(Some(profile)) => {
-                    self.profile = profile;
-                    Task::none()
+            Message::ImportProfileFinished(result) => {
+                if result.as_ref().is_ok_and(Option::is_some) {
+                    self.screen = Screen::Configure;
                 }
-                Ok(None) => Task::none(),
-                Err(err) => Task::perform(
-                    async {
-                        tokio::task::spawn_blocking(move || {
-                            native_dialog::MessageDialog::new()
-                                .set_type(native_dialog::MessageType::Error)
-                                .set_title("Failed to export")
-                                .set_text(&err.to_string())
-                                .show_alert()
-                                .expect("failed to show failed dialog");
-                        })
-                        .await
-                        .expect("could not join dialog task");
-                    },
-                    |_| Message::NoOp,
-                ),
-            },
+                match result {
+                    Ok(Some(profile)) => {
+                        self.profile = profile;
+                        Task::none()
+                    }
+                    Ok(None) => Task::none(),
+                    Err(err) => Task::perform(
+                        async move {
+                            rfd::AsyncMessageDialog::new()
+                                .set_level(rfd::MessageLevel::Error)
+                                .set_title("Failed to import profile")
+                                .set_description(err.to_string())
+                                .show()
+                                .await;
+                        },
+                        |_| Message::NoOp,
+                    ),
+                }
+            }
             Message::NewProfile => {
                 self.profile = Profile::default();
                 Task::none()
             }
-            Message::WelcomeImportProfile => {
-                self.screen = Screen::Configure;
-                Task::done(Message::ImportProfile)
-            }
+            Message::WelcomeImportProfile => Task::done(Message::ImportProfile),
             Message::WelcomeNewProfile => {
                 self.screen = Screen::Configure;
                 Task::none()
