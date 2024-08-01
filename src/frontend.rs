@@ -18,7 +18,7 @@ use utils::rounded_button;
 
 use crate::backend::profile::Profile;
 use crate::backend::stream::{ActiveStream, WorkerEvent};
-use crate::DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION;
+use crate::{DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION, GITHUB_URL};
 
 #[derive(Debug)]
 pub struct DaktronicsSingularUiApp {
@@ -56,6 +56,7 @@ pub enum Message {
     ExportProfileFinished,
     WelcomeNewProfile,
     WelcomeImportProfile,
+    WelcomeGitHub,
     StartStream(String),
     EndStream,
     SwitchScreen(HeaderScreen),
@@ -228,6 +229,10 @@ impl DaktronicsSingularUiApp {
             Message::WelcomeImportProfile => Task::done(Message::ImportProfileFromPicker),
             Message::WelcomeNewProfile => {
                 self.screen = Screen::Configure;
+                Task::none()
+            }
+            Message::WelcomeGitHub => {
+                open::that_detached(GITHUB_URL).expect("failed to launch github in browser");
                 Task::none()
             }
             Message::StartStream(tty_path) => match self.screen {
@@ -411,6 +416,12 @@ impl DaktronicsSingularUiApp {
                             utils::RoundedButtonVariant::Primary,
                         )
                         .on_press(Message::WelcomeNewProfile)
+                        .into(),
+                        rounded_button(
+                            text("Open GitHub source").size(18),
+                            utils::RoundedButtonVariant::Secondary,
+                        )
+                        .on_press(Message::WelcomeGitHub)
                         .into(),
                     ])
                     .spacing(8)

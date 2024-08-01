@@ -8,6 +8,7 @@ mod mock;
 const APP_NAME: &str = "Daktronics Singular UI";
 const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 const DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION: &str = "dsu";
+const GITHUB_URL: &str = "https://github.com/zabackary/daktronics-singular-ui";
 
 fn main() -> iced::Result {
     let program_icon = image::load_from_memory_with_format(
