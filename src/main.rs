@@ -35,6 +35,7 @@ fn main() -> iced::Result {
         DaktronicsSingularUiApp::update,
         DaktronicsSingularUiApp::view,
     )
+    .subscription(DaktronicsSingularUiApp::subscription)
     .window(iced::window::Settings {
         min_size: Some(Size::new(700.0, 400.0)),
         icon: Some(
@@ -49,6 +50,7 @@ fn main() -> iced::Result {
     })
     .font(include_bytes!("../assets/FiraSans-Regular.ttf"))
     .default_font(Font::with_name("Fira Sans"))
+    .exit_on_close_request(false)
     .theme(|app| {
         iced::theme::Theme::custom(
             "Daktronics Singular UI".to_owned(),

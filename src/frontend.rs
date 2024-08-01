@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use configure::{configure, ConfigureEvent};
 use header::{header, HeaderScreen};
 use iced::widget::{column, container, row, text};
-use iced::{Alignment, Element, Length, Task};
+use iced::{Alignment, Element, Length, Subscription, Task};
 use stream_running::stream_running;
 use stream_start::stream_start;
 use tokio::fs;
@@ -46,7 +46,9 @@ impl Default for DaktronicsSingularUiApp {
 #[derive(Debug, Clone)]
 pub enum Message {
     NoOp,
+    TryNewProfile,
     NewProfile,
+    TryImportProfile,
     ImportProfile,
     ImportProfileFinished(Result<Option<Profile>, String>),
     ExportProfile,
@@ -61,6 +63,8 @@ pub enum Message {
     UpdateStreamStatsResponse(Vec<WorkerEvent>),
     ClearStreamErrors,
     HandleConfigureEvent(ConfigureEvent),
+    CloseRequested,
+    Close,
 }
 
 #[derive(Debug, Default)]
@@ -152,6 +156,25 @@ impl DaktronicsSingularUiApp {
                     |_| Message::NoOp,
                 )
             }
+            Message::TryImportProfile => {
+                if self.profile_dirty {
+                    Task::future(async {
+                        match rfd::AsyncMessageDialog::new()
+                            .set_level(rfd::MessageLevel::Warning)
+                            .set_title("Confirm overwrite profile")
+                            .set_description("Your current profile has unsaved changes. Importing a profile will discard any changes that haven't been exported from the old profile.")
+                            .set_buttons(rfd::MessageButtons::OkCancel)
+                            .show()
+                            .await {
+                                rfd::MessageDialogResult::Ok => Message::NewProfile,
+                                rfd::MessageDialogResult::Cancel => Message::NoOp,
+                                _ => unreachable!("ok/cancel dialog will returned non-Ok/Cancel result")
+                            }
+                    })
+                } else {
+                    Task::done(Message::ImportProfile)
+                }
+            }
             Message::ImportProfile => Task::perform(
                 async move {
                     if let Some(path) = rfd::AsyncFileDialog::new()
@@ -199,6 +222,25 @@ impl DaktronicsSingularUiApp {
                     |_| Message::NoOp,
                 ),
             },
+            Message::TryNewProfile => {
+                if self.profile_dirty {
+                    Task::future(async {
+                        match rfd::AsyncMessageDialog::new()
+                            .set_level(rfd::MessageLevel::Warning)
+                            .set_title("Confirm overwrite profile")
+                            .set_description("Your current profile has unsaved changes. Creating a new one will discard any changes not already exported.")
+                            .set_buttons(rfd::MessageButtons::OkCancel)
+                            .show()
+                            .await {
+                                rfd::MessageDialogResult::Ok => Message::NewProfile,
+                                rfd::MessageDialogResult::Cancel => Message::NoOp,
+                                _ => unreachable!("ok/cancel dialog will returned non-Ok/Cancel result")
+                            }
+                    })
+                } else {
+                    Task::done(Message::NewProfile)
+                }
+            }
             Message::NewProfile => {
                 self.profile = Profile::default();
                 self.profile_dirty = false;
@@ -306,7 +348,58 @@ impl DaktronicsSingularUiApp {
                 };
                 Task::none()
             }
+            Message::CloseRequested => {
+                let profile_dirty = self.profile_dirty;
+                let is_streaming = matches!(self.screen, Screen::Stream(_));
+                if profile_dirty || is_streaming {
+                    Task::future(async move {
+                        match rfd::AsyncMessageDialog::new()
+                            .set_level(rfd::MessageLevel::Warning)
+                            .set_title("Confirm quit")
+                            .set_description(&format!("{} Are you sure you want to close the application?", match (profile_dirty, is_streaming) {
+                                (true, true) => "You are currently streaming to Singular, so quitting the application will terminate the data stream! In addition, you have not saved your profile and all unsaved changes will be discarded if you quit.",
+                                (false, true) => "You are currently streaming to Singular, so quitting the application will terminate the data stream!",
+                                (true, false) => "You have not saved your profile, so all unsaved changes will be discarded if you quit.",
+                                (false, false) => unreachable!()
+                            }))
+                            .set_buttons(rfd::MessageButtons::OkCancel)
+                            .show()
+                            .await {
+                                rfd::MessageDialogResult::Ok => {
+                                    Message::Close
+                                }
+                                rfd::MessageDialogResult::Cancel => {
+                                    Message::NoOp
+                                }
+                                _ => unreachable!("ok/cancel message dialog returned non-Ok/Cancel")
+                            }
+                    })
+                } else {
+                    Task::done(Message::Close)
+                }
+            }
+            Message::Close => iced::exit(),
         }
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        iced::event::listen_with(|event, status, _id| {
+            if matches!(status, iced::event::Status::Ignored) {
+                match event {
+                    iced::Event::Window(window_event) => match window_event {
+                        iced::window::Event::CloseRequested => Some(Message::CloseRequested),
+                        iced::window::Event::FileDropped(_path) => {
+                            // TODO: handle file dropped to import the file
+                            None
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        })
     }
 
     pub fn view(&self) -> Element<Message> {
@@ -365,9 +458,9 @@ impl DaktronicsSingularUiApp {
                     Message::SwitchScreen,
                     &self.profile.name,
                     Message::ProfileNameChange,
-                    Message::ImportProfile,
+                    Message::TryImportProfile,
                     Message::ExportProfile,
-                    Message::NewProfile,
+                    Message::TryNewProfile,
                     matches!(self.screen, Screen::Stream(_)).then_some(Message::EndStream),
                 )
                 .into(),
