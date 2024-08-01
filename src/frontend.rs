@@ -149,7 +149,7 @@ impl DaktronicsSingularUiApp {
                             .set_buttons(rfd::MessageButtons::OkCancel)
                             .show()
                             .await {
-                                rfd::MessageDialogResult::Ok => Message::NewProfile,
+                                rfd::MessageDialogResult::Ok => Message::ImportProfileFromPicker,
                                 rfd::MessageDialogResult::Cancel => Message::NoOp,
                                 _ => unreachable!("ok/cancel dialog will returned non-Ok/Cancel result")
                             }
