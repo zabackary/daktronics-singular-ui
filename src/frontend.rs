@@ -49,10 +49,11 @@ pub enum Message {
     TryNewProfile,
     NewProfile,
     TryImportProfile,
-    ImportProfile,
-    ImportProfileFinished(Result<Option<Profile>, String>),
+    ImportProfileFromPicker,
+    ImportProfileFromPath(PathBuf),
+    ImportProfileFinished(Profile),
     ExportProfile,
-    ExportProfileFinished(Result<Option<PathBuf>, String>),
+    ExportProfileFinished,
     WelcomeNewProfile,
     WelcomeImportProfile,
     StartStream(String),
@@ -83,78 +84,60 @@ impl DaktronicsSingularUiApp {
             Message::ExportProfile => {
                 let profile_name = self.profile.name.clone();
                 let result = serde_json::to_string(&self.profile);
-                Task::perform(
-                    async move {
-                        match result {
-                            Ok(serialized) => {
-                                if let Some(location) = rfd::AsyncFileDialog::new()
-                                    .set_title("Save profile as")
-                                    .add_filter(
-                                        "Daktronics Singular UI Profile",
-                                        &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
-                                    )
-                                    .set_file_name(&format!(
-                                        "{}.dsu",
-                                        filenamify::filenamify(profile_name)
-                                    ))
-                                    .save_file()
-                                    .await
-                                {
-                                    fs::write(location.path(), serialized)
-                                        .await
-                                        .map(|_| Some(location.path().to_path_buf()))
-                                        .map_err(|err| err.to_string())
-                                } else {
-                                    Ok(None)
-                                }
-                            }
-                            Err(err) => {
-                                rfd::AsyncMessageDialog::new()
-                                    .set_level(rfd::MessageLevel::Error)
-                                    .set_title("Failed to export profile")
-                                    .set_description(err.to_string())
-                                    .show()
-                                    .await;
-                                Ok(None)
-                            }
+                Task::future(async move {
+                    async fn export_profile(
+                        profile_name: &str,
+                        serialized: serde_json::Result<String>,
+                    ) -> Result<Option<PathBuf>, String> {
+                        let serialized = serialized.map_err(|x| x.to_string())?;
+                        if let Some(location) = rfd::AsyncFileDialog::new()
+                            .set_title("Save profile as")
+                            .add_filter(
+                                "Daktronics Singular UI Profile",
+                                &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
+                            )
+                            .set_file_name(&format!("{}.dsu", filenamify::filenamify(profile_name)))
+                            .save_file()
+                            .await
+                        {
+                            fs::write(location.path(), serialized)
+                                .await
+                                .map(|_| Some(location.path().to_path_buf()))
+                                .map_err(|err| err.to_string())
+                        } else {
+                            Ok(None)
                         }
-                    },
-                    Message::ExportProfileFinished,
-                )
+                    }
+                    match export_profile(&profile_name, result).await {
+                        Ok(Some(location)) => {
+                            rfd::AsyncMessageDialog::new()
+                                .set_title("Finished export")
+                                .set_description(&format!(
+                                    "Finished exporting the profile \"{}\" to {}",
+                                    profile_name,
+                                    location.display()
+                                ))
+                                .set_level(rfd::MessageLevel::Info)
+                                .show()
+                                .await;
+                            Message::ExportProfileFinished
+                        }
+                        Ok(None) => Message::NoOp,
+                        Err(err) => {
+                            rfd::AsyncMessageDialog::new()
+                                .set_level(rfd::MessageLevel::Error)
+                                .set_title("Failed to export profile")
+                                .set_description(err.to_string())
+                                .show()
+                                .await;
+                            Message::NoOp
+                        }
+                    }
+                })
             }
-            Message::ExportProfileFinished(result) => {
-                if result.as_ref().is_ok_and(Option::is_some) {
-                    self.profile_dirty = false;
-                }
-                let profile_name = self.profile.name.clone();
-                Task::perform(
-                    async move {
-                        match result {
-                            Ok(Some(location)) => {
-                                rfd::AsyncMessageDialog::new()
-                                    .set_title("Finished export")
-                                    .set_description(&format!(
-                                        "Finished exporting the profile \"{}\" to {}",
-                                        profile_name,
-                                        location.display()
-                                    ))
-                                    .set_level(rfd::MessageLevel::Info)
-                                    .show()
-                                    .await;
-                            }
-                            Ok(None) => {}
-                            Err(err) => {
-                                rfd::AsyncMessageDialog::new()
-                                    .set_level(rfd::MessageLevel::Error)
-                                    .set_title("Failed to export profile")
-                                    .set_description(err.to_string())
-                                    .show()
-                                    .await;
-                            }
-                        }
-                    },
-                    |_| Message::NoOp,
-                )
+            Message::ExportProfileFinished => {
+                self.profile_dirty = false;
+                Task::none()
             }
             Message::TryImportProfile => {
                 if self.profile_dirty {
@@ -172,56 +155,52 @@ impl DaktronicsSingularUiApp {
                             }
                     })
                 } else {
-                    Task::done(Message::ImportProfile)
+                    Task::done(Message::ImportProfileFromPicker)
                 }
             }
-            Message::ImportProfile => Task::perform(
-                async move {
-                    if let Some(path) = rfd::AsyncFileDialog::new()
-                        .set_title("Open profile")
-                        .add_filter(
-                            "Daktronics Singular UI Profile",
-                            &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
-                        )
-                        .pick_file()
-                        .await
-                    {
-                        let mut file = fs::File::open(path.path())
-                            .await
-                            .map_err(|err| err.to_string())?;
-                        let mut buffer = String::new();
-                        file.read_to_string(&mut buffer)
-                            .await
-                            .map_err(|err| err.to_string())?;
-                        serde_json::from_str(&buffer)
-                            .map_err(|err| err.to_string())
-                            .map(Some)
-                    } else {
-                        Ok(None)
-                    }
-                },
-                Message::ImportProfileFinished,
-            ),
-            Message::ImportProfileFinished(result) => match result {
-                Ok(Some(profile)) => {
-                    self.profile = profile;
-                    self.profile_dirty = false;
-                    self.screen = Screen::Configure;
-                    Task::none()
+            Message::ImportProfileFromPicker => Task::future(async move {
+                if let Some(path) = rfd::AsyncFileDialog::new()
+                    .set_title("Open profile")
+                    .add_filter(
+                        "Daktronics Singular UI Profile",
+                        &[DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION],
+                    )
+                    .pick_file()
+                    .await
+                {
+                    Message::ImportProfileFromPath(path.path().to_path_buf())
+                } else {
+                    Message::NoOp
                 }
-                Ok(None) => Task::none(),
-                Err(err) => Task::perform(
-                    async move {
+            }),
+            Message::ImportProfileFromPath(path) => Task::future(async move {
+                async fn import_from_path(path: PathBuf) -> Result<Profile, String> {
+                    let mut file = fs::File::open(path).await.map_err(|err| err.to_string())?;
+                    let mut buffer = String::new();
+                    file.read_to_string(&mut buffer)
+                        .await
+                        .map_err(|err| err.to_string())?;
+                    serde_json::from_str(&buffer).map_err(|err| err.to_string())
+                }
+                match import_from_path(path).await {
+                    Ok(profile) => Message::ImportProfileFinished(profile),
+                    Err(err) => {
                         rfd::AsyncMessageDialog::new()
                             .set_level(rfd::MessageLevel::Error)
                             .set_title("Failed to import profile")
                             .set_description(err.to_string())
                             .show()
                             .await;
-                    },
-                    |_| Message::NoOp,
-                ),
-            },
+                        Message::NoOp
+                    }
+                }
+            }),
+            Message::ImportProfileFinished(profile) => {
+                self.profile = profile;
+                self.profile_dirty = false;
+                self.screen = Screen::Configure;
+                Task::none()
+            }
             Message::TryNewProfile => {
                 if self.profile_dirty {
                     Task::future(async {
@@ -246,7 +225,7 @@ impl DaktronicsSingularUiApp {
                 self.profile_dirty = false;
                 Task::none()
             }
-            Message::WelcomeImportProfile => Task::done(Message::ImportProfile),
+            Message::WelcomeImportProfile => Task::done(Message::ImportProfileFromPicker),
             Message::WelcomeNewProfile => {
                 self.screen = Screen::Configure;
                 Task::none()
