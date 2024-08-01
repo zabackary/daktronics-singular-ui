@@ -8,8 +8,9 @@ publish = false
 
 [dependencies]
 daktronics-allsport-5000 = { version = "^0.3.1", features = ["serde"] }
-dark-light = "1.1.1"
+dark-light = "^1.1.1"
 filenamify = "0.1.1"
+image = "^0.25.2"
 reqwest = { version = "^0.12.5", features = ["json"] }
 rfd = "^0.14.1"
 serde = { version = "^1.0.204", features = ["derive"] }

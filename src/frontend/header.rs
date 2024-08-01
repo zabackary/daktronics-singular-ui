@@ -1,7 +1,7 @@
 use iced::{
     border::Radius,
     widget::{
-        button, column, component, container, horizontal_space, row, text, text_input,
+        button, column, component, container, horizontal_space, row, svg, text, text_input,
         vertical_space, Component, Space,
     },
     Border, Color, Element, Length, Renderer, Shadow, Size, Theme,
@@ -201,6 +201,15 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
         container(
             column([
                 row([
+                    container(
+                        svg(svg::Handle::from_memory(include_bytes!(
+                            "../../assets/logo.svg"
+                        )))
+                        .content_fit(iced::ContentFit::Fill),
+                    )
+                    .width(24)
+                    .height(24)
+                    .into(),
                     text("Daktronics Singular UI").size(18).into(),
                     horizontal_space().into(),
                     {

@@ -1,5 +1,5 @@
 use frontend::DaktronicsSingularUiApp;
-use iced::{theme::Palette, Color, Font, Size};
+use iced::{theme::Palette, window::icon, Color, Font, Size};
 
 mod backend;
 mod frontend;
@@ -9,6 +9,15 @@ const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PK
 const DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION: &str = "dsu";
 
 fn main() -> iced::Result {
+    let program_icon = image::load_from_memory_with_format(
+        include_bytes!("../assets/logo.png"),
+        image::ImageFormat::Png,
+    )
+    .expect("couldn't parse static program icon")
+    .to_rgba8();
+    let program_icon_width = program_icon.width();
+    let program_icon_height = program_icon.height();
+
     iced::application(
         "Daktronics Singular UI",
         DaktronicsSingularUiApp::update,
@@ -16,7 +25,14 @@ fn main() -> iced::Result {
     )
     .window(iced::window::Settings {
         min_size: Some(Size::new(700.0, 400.0)),
-        icon: None,
+        icon: Some(
+            icon::from_rgba(
+                program_icon.into_vec(),
+                program_icon_width,
+                program_icon_height,
+            )
+            .expect("failed to construct static program icon"),
+        ),
         ..Default::default()
     })
     .font(include_bytes!("../assets/FiraSans-Regular.ttf"))
