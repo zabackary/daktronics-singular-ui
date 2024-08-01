@@ -7,6 +7,8 @@ use iced::{
     Border, Color, Element, Length, Renderer, Shadow, Size, Theme,
 };
 
+use crate::APP_NAME;
+
 use super::utils::{icon_button, rounded_button, rounded_text_input_style};
 
 #[derive(Debug, Clone)]
@@ -210,7 +212,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                     .width(24)
                     .height(24)
                     .into(),
-                    text("Daktronics Singular UI").size(18).into(),
+                    text(APP_NAME).size(18).into(),
                     horizontal_space().into(),
                     {
                         let input = text_input("Profile name", self.profile_name)

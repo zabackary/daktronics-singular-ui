@@ -61,16 +61,19 @@ fn enumerate_ports() -> Vec<SerialPortInfoWrapper> {
 pub struct StreamStart<'a, Message: Clone> {
     on_stream_start: Box<dyn Fn(String) -> Message>,
     error: Option<&'a str>,
+    profile_is_dirty: bool,
 }
 
 impl<'a, Message: Clone> StreamStart<'a, Message> {
     pub fn new(
         on_stream_start: impl Fn(String) -> Message + 'static,
         error: Option<&'a str>,
+        profile_is_dirty: bool,
     ) -> StreamStart<'a, Message> {
         StreamStart::<Message> {
             on_stream_start: Box::new(on_stream_start),
             error,
+            profile_is_dirty,
         }
     }
 }
@@ -78,8 +81,9 @@ impl<'a, Message: Clone> StreamStart<'a, Message> {
 pub fn stream_start<'a, Message: Clone>(
     on_stream_start: impl Fn(String) -> Message + 'static,
     error: Option<&'a str>,
+    profile_is_dirty: bool,
 ) -> StreamStart<'a, Message> {
-    StreamStart::<Message>::new(on_stream_start, error)
+    StreamStart::<Message>::new(on_stream_start, error, profile_is_dirty)
 }
 
 #[derive(Debug, Clone)]
@@ -188,6 +192,40 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                         .height(24)
                         .into(),
                         text(error).style(text::danger).into(),
+                    ])
+                    .align_items(Alignment::Center)
+                    .spacing(8),
+                )
+                .style(|theme: &iced::Theme| container::Style {
+                    background: None,
+                    text_color: None,
+                    shadow: Shadow::default(),
+                    border: Border {
+                        color: theme.palette().danger,
+                        width: 1.0,
+                        radius: 999.into(),
+                    },
+                })
+                .padding([8, 16])
+            }))
+            .push_maybe(self.profile_is_dirty.then(|| {
+                container(
+                    row([
+                        container(
+                            svg(svg::Handle::from_memory(include_bytes!(
+                                "../../assets/icon_warning.svg"
+                            )))
+                            .style(|theme: &Theme, _| svg::Style {
+                                color: Some(theme.palette().danger),
+                            })
+                            .content_fit(iced::ContentFit::Fill),
+                        )
+                        .width(24)
+                        .height(24)
+                        .into(),
+                        text("The profile has not been saved yet.")
+                            .style(text::danger)
+                            .into(),
                     ])
                     .align_items(Alignment::Center)
                     .spacing(8),

@@ -1,10 +1,11 @@
-use frontend::DaktronicsSingularUiApp;
+use frontend::{DaktronicsSingularUiApp, Screen};
 use iced::{theme::Palette, window::icon, Color, Font, Size};
 
 mod backend;
 mod frontend;
 mod mock;
 
+const APP_NAME: &str = "Daktronics Singular UI";
 const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 const DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION: &str = "dsu";
 
@@ -19,7 +20,18 @@ fn main() -> iced::Result {
     let program_icon_height = program_icon.height();
 
     iced::application(
-        "Daktronics Singular UI",
+        |app: &DaktronicsSingularUiApp| {
+            if matches!(app.screen, Screen::Welcome) {
+                APP_NAME.to_owned()
+            } else {
+                format!(
+                    "{} - {}{}",
+                    APP_NAME,
+                    app.profile.name,
+                    if app.profile_dirty { "*" } else { "" }
+                )
+            }
+        },
         DaktronicsSingularUiApp::update,
         DaktronicsSingularUiApp::view,
     )

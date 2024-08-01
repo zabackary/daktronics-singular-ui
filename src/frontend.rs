@@ -22,9 +22,10 @@ use crate::DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION;
 
 #[derive(Debug)]
 pub struct DaktronicsSingularUiApp {
-    screen: Screen,
-    profile: Profile,
-    pub(super) dark_mode: bool,
+    pub screen: Screen,
+    pub profile: Profile,
+    pub profile_dirty: bool,
+    pub dark_mode: bool,
 }
 
 fn use_dark_mode() -> bool {
@@ -35,6 +36,7 @@ impl Default for DaktronicsSingularUiApp {
     fn default() -> Self {
         DaktronicsSingularUiApp {
             screen: Default::default(),
+            profile_dirty: false,
             profile: Default::default(),
             dark_mode: use_dark_mode(),
         }
@@ -62,7 +64,7 @@ pub enum Message {
 }
 
 #[derive(Debug, Default)]
-enum Screen {
+pub enum Screen {
     Configure,
     Stream(ActiveStream),
     StreamStart(Option<String>),
@@ -117,6 +119,9 @@ impl DaktronicsSingularUiApp {
                 )
             }
             Message::ExportProfileFinished(result) => {
+                if result.as_ref().is_ok_and(Option::is_some) {
+                    self.profile_dirty = false;
+                }
                 let profile_name = self.profile.name.clone();
                 Task::perform(
                     async move {
@@ -174,31 +179,29 @@ impl DaktronicsSingularUiApp {
                 },
                 Message::ImportProfileFinished,
             ),
-            Message::ImportProfileFinished(result) => {
-                if result.as_ref().is_ok_and(Option::is_some) {
+            Message::ImportProfileFinished(result) => match result {
+                Ok(Some(profile)) => {
+                    self.profile = profile;
+                    self.profile_dirty = false;
                     self.screen = Screen::Configure;
+                    Task::none()
                 }
-                match result {
-                    Ok(Some(profile)) => {
-                        self.profile = profile;
-                        Task::none()
-                    }
-                    Ok(None) => Task::none(),
-                    Err(err) => Task::perform(
-                        async move {
-                            rfd::AsyncMessageDialog::new()
-                                .set_level(rfd::MessageLevel::Error)
-                                .set_title("Failed to import profile")
-                                .set_description(err.to_string())
-                                .show()
-                                .await;
-                        },
-                        |_| Message::NoOp,
-                    ),
-                }
-            }
+                Ok(None) => Task::none(),
+                Err(err) => Task::perform(
+                    async move {
+                        rfd::AsyncMessageDialog::new()
+                            .set_level(rfd::MessageLevel::Error)
+                            .set_title("Failed to import profile")
+                            .set_description(err.to_string())
+                            .show()
+                            .await;
+                    },
+                    |_| Message::NoOp,
+                ),
+            },
             Message::NewProfile => {
                 self.profile = Profile::default();
+                self.profile_dirty = false;
                 Task::none()
             }
             Message::WelcomeImportProfile => Task::done(Message::ImportProfile),
@@ -270,6 +273,7 @@ impl DaktronicsSingularUiApp {
                 _ => Task::none(),
             },
             Message::HandleConfigureEvent(event) => {
+                self.profile_dirty = true;
                 match event {
                     ConfigureEvent::DataStreamUrlUpdated(new) => self.profile.data_stream_url = new,
                     ConfigureEvent::SubcompNameUpdated(new) => self.profile.subcomp_name = new,
@@ -374,7 +378,8 @@ impl DaktronicsSingularUiApp {
                         stream_running(active_stream, Message::ClearStreamErrors).into()
                     }
                     Screen::StreamStart(error) => {
-                        stream_start(Message::StartStream, error.as_deref()).into()
+                        stream_start(Message::StartStream, error.as_deref(), self.profile_dirty)
+                            .into()
                     }
                     Screen::Welcome => unreachable!(),
                 },
