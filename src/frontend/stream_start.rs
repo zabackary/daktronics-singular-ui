@@ -36,12 +36,26 @@ impl Display for SerialPortInfoWrapper {
     }
 }
 
+impl PartialOrd for SerialPortInfoWrapper {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.port_name.partial_cmp(&other.0.port_name)
+    }
+}
+
+impl Ord for SerialPortInfoWrapper {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.port_name.cmp(&other.0.port_name)
+    }
+}
+
 fn enumerate_ports() -> Vec<SerialPortInfoWrapper> {
-    tokio_serial::available_ports()
+    let mut ports = tokio_serial::available_ports()
         .unwrap_or(vec![])
         .into_iter()
         .map(SerialPortInfoWrapper)
-        .collect()
+        .collect::<Vec<_>>();
+    ports.sort();
+    ports
 }
 
 pub struct StreamStart<'a, Message: Clone> {
