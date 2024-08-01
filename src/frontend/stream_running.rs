@@ -1,5 +1,3 @@
-use std::i32;
-
 use iced::{
     widget::{column, component, container, horizontal_space, row, scrollable, text, Component},
     Element, Font, Length, Renderer, Size, Theme,
