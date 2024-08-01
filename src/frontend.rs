@@ -234,6 +234,7 @@ impl DaktronicsSingularUiApp {
                 Task::none()
             }
             Message::ProfileNameChange(new_name) => {
+                self.profile_dirty = true;
                 self.profile.name = new_name;
                 Task::none()
             }
