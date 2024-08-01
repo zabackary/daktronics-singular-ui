@@ -21,9 +21,7 @@ tokio = { version = "^1.38.0", features = ["full"] }
 tokio-serial = "^5.4.4"
 iced = { git = "https://github.com/iced-rs/iced.git", features = [
   "tokio",
-  "debug",
   "lazy",
   "svg",
+  "canvas",
 ] }
-# to force dependency resolution conflict to work
-web-sys = "=0.3.67"
