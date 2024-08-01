@@ -367,9 +367,8 @@ impl DaktronicsSingularUiApp {
                 match event {
                     iced::Event::Window(window_event) => match window_event {
                         iced::window::Event::CloseRequested => Some(Message::CloseRequested),
-                        iced::window::Event::FileDropped(_path) => {
-                            // TODO: handle file dropped to import the file
-                            None
+                        iced::window::Event::FileDropped(path) => {
+                            Some(Message::ImportProfileFromPath(path))
                         }
                         _ => None,
                     },
