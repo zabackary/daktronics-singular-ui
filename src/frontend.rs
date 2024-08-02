@@ -1,4 +1,5 @@
 mod configure;
+mod graph;
 mod header;
 mod stream_running;
 mod stream_start;

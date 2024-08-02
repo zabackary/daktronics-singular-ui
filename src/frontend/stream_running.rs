@@ -5,7 +5,10 @@ use iced::{
 
 use crate::backend::stream::ActiveStream;
 
-use super::utils::{icon_button, rounded_pane};
+use super::{
+    graph::graph,
+    utils::{icon_button, rounded_pane},
+};
 
 pub struct StreamRunning<'a, Message> {
     active_stream: &'a ActiveStream,
@@ -91,7 +94,14 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                 // not sure why Rust needs annotations but whatever
                 Option::<&str>::None,
             ),
-            rounded_pane(text("TODO")).fill().into(),
+            rounded_pane(
+                container(graph(&self.active_stream))
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding(16),
+            )
+            .fill()
+            .into(),
         ]);
         let payload_pane = {
             let payload = self.active_stream.latest_payload();
@@ -99,6 +109,8 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                 pane_header(
                     "Latest payload",
                     payload
+                        // TODO: this is not a correct computation since the payload
+                        // we get here is not the minified version
                         .map(|x| x.as_bytes().len().try_into().unwrap_or(i32::MAX))
                         .unwrap_or(0),
                     "B",
