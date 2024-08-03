@@ -86,6 +86,25 @@ impl Display for DynamicSportType {
     }
 }
 
+#[derive(Debug)]
+struct DummyDataSource {}
+
+impl RTDStateDataSource for DummyDataSource {
+    type Error = String;
+
+    fn read_packet(
+        &mut self,
+    ) -> Result<Option<daktronics_allsport_5000::packet::Packet>, Self::Error> {
+        unimplemented!("dummy data source");
+    }
+
+    async fn read_packet_async(
+        &mut self,
+    ) -> Result<Option<daktronics_allsport_5000::packet::Packet>, Self::Error> {
+        unimplemented!("dummy data source");
+    }
+}
+
 impl DynamicSportType {
     pub const ALL: [DynamicSportType; 22] = [
         DynamicSportType::AutoRacing,
@@ -157,6 +176,16 @@ impl DynamicSportType {
             }
             DynamicSportType::WaterPolo => DynamicSport::WaterPolo(WaterPoloSport::new(rtd_state)),
             DynamicSportType::Wrestling => DynamicSport::Wrestling(WrestlingSport::new(rtd_state)),
+        }
+    }
+
+    pub fn all_serialized_keys(&self) -> serde_json::Result<Vec<String>> {
+        let state = RTDState::new(DummyDataSource {});
+        let dynamic_sport = self.as_dynamic_sport(state);
+        let value = dynamic_sport.serialize_to_value()?;
+        match value {
+            serde_json::Value::Object(value) => Ok(value.into_iter().map(|x| x.0).collect()),
+            _ => panic!("dynamic sport didn't serialize to object"),
         }
     }
 }
