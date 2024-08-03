@@ -214,7 +214,7 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                         .spacing(8),
                     )
                     .style(|theme: &iced::Theme| container::Style {
-                        background: None,
+                        background: Some(theme.palette().background.into()),
                         text_color: None,
                         shadow: Shadow::default(),
                         border: Border {
@@ -248,7 +248,7 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                         .spacing(8),
                     )
                     .style(|theme: &iced::Theme| container::Style {
-                        background: None,
+                        background: Some(theme.palette().background.into()),
                         text_color: None,
                         shadow: Shadow::default(),
                         border: Border {
