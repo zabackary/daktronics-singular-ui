@@ -153,6 +153,7 @@ impl ActiveStream {
 
         let network_processing_join_handle = {
             let serialized = serialized.clone();
+            let composition_name = profile.subcomp_name.clone();
             let data_stream_url = profile.data_stream_url.clone();
             let mapping = profile.mapping.clone();
             let client = reqwest::Client::builder()
@@ -175,7 +176,11 @@ impl ActiveStream {
                 loop {
                     let serialized = { serialized.lock().await.take() };
                     if let Some(value) = serialized {
-                        match mapping.map(&value, profile.exclude_incomplete_data) {
+                        match mapping.map(
+                            &composition_name,
+                            &value,
+                            profile.exclude_incomplete_data,
+                        ) {
                             Ok(serialized) => {
                                 let stringified = serialized.to_string();
                                 let stringified_bytes = stringified.as_bytes().len();
