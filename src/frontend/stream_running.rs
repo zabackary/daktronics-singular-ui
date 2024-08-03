@@ -104,17 +104,17 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
             .into(),
         ]);
         let payload_pane = {
-            let payload = self.active_stream.latest_payload();
             column([
                 pane_header(
                     "Latest payload",
-                    payload
-                        // TODO: this is not a correct computation since the payload
-                        // we get here is not the minified version
-                        .map(|x| x.as_bytes().len().try_into().unwrap_or(i32::MAX))
-                        .unwrap_or(0),
+                    self.active_stream
+                        .latest_payload_size()
+                        .unwrap_or(0)
+                        .try_into()
+                        .unwrap_or(i32::MAX),
                     "B",
                     // not sure why Rust needs annotations but whatever
+                    // &str can be `into`'ed into an Element, so it works
                     Option::<&str>::None,
                 ),
                 rounded_pane(scrollable(

@@ -59,7 +59,7 @@ impl From<String> for ErrorInfo {
 pub enum WorkerEvent {
     ErrorEvent(ErrorInfo),
     SerialEvent(SerialEvent),
-    LatencySampleEvent(LatencySample, Option<String>),
+    LatencySampleEvent(LatencySample, Option<String>, usize),
 }
 
 #[derive(Debug)]
@@ -67,6 +67,7 @@ pub struct ActiveStream {
     latency_graph_data: LatencyGraphData,
     /// The latest payload the server is currently holding right now
     latest_payload: Option<String>,
+    latest_payload_size: Option<usize>,
     errors: Vec<ErrorInfo>,
 
     serial_join_handle: JoinHandle<()>,
@@ -176,6 +177,8 @@ impl ActiveStream {
                     if let Some(value) = serialized {
                         match mapping.map(&value, profile.exclude_incomplete_data) {
                             Ok(serialized) => {
+                                let stringified = serialized.to_string();
+                                let stringified_bytes = stringified.as_bytes().len();
                                 let pretty_stringified =
                                     serde_json::to_string_pretty(&serialized).ok();
                                 if profile.multiple_requests {
@@ -187,7 +190,7 @@ impl ActiveStream {
                                         match put_to_server(
                                             &client,
                                             &data_stream_url,
-                                            serialized.to_string(),
+                                            stringified,
                                         )
                                         .await
                                         {
@@ -202,6 +205,7 @@ impl ActiveStream {
                                                         latency,
                                                     },
                                                     pretty_stringified,
+                                                    stringified_bytes
                                                 ))
                                                 .await
                                                 .expect("worker event tx closed!"),
@@ -211,7 +215,7 @@ impl ActiveStream {
                                     match put_to_server(
                                         &client,
                                         &data_stream_url,
-                                        serialized.to_string(),
+                                        stringified,
                                     )
                                     .await
                                     {
@@ -226,6 +230,7 @@ impl ActiveStream {
                                                     latency,
                                                 },
                                                 pretty_stringified,
+                                                stringified_bytes
                                             ))
                                             .await
                                             .expect("worker event tx closed!"),
@@ -259,11 +264,34 @@ impl ActiveStream {
                 serial_events: vec![],
             },
             latest_payload: None,
+            latest_payload_size: None,
             errors: vec![],
             serial_join_handle,
             network_processing_join_handle,
             worker_event_rx: Arc::new(Mutex::new(worker_event_rx)),
         })
+    }
+
+    fn update_from_event(
+        errors: &mut Vec<ErrorInfo>,
+        latest_payload: &mut Option<String>,
+        latest_payload_size: &mut Option<usize>,
+        latency_graph_data: &mut LatencyGraphData,
+        event: WorkerEvent,
+    ) {
+        match event {
+            WorkerEvent::ErrorEvent(err) => errors.push(err),
+            WorkerEvent::LatencySampleEvent(
+                sample,
+                new_latest_payload,
+                new_latest_payload_size,
+            ) => {
+                *latest_payload = new_latest_payload;
+                *latest_payload_size = Some(new_latest_payload_size);
+                latency_graph_data.samples.push(sample)
+            }
+            WorkerEvent::SerialEvent(event) => latency_graph_data.serial_events.push(event),
+        }
     }
 
     pub async fn update_stats(&mut self) {
@@ -272,16 +300,13 @@ impl ActiveStream {
             while !rx.is_empty() {
                 let event = rx.recv().await;
                 if let Some(event) = event {
-                    match event {
-                        WorkerEvent::ErrorEvent(err) => self.errors.push(err),
-                        WorkerEvent::LatencySampleEvent(sample, latest_payload) => {
-                            self.latest_payload = latest_payload;
-                            self.latency_graph_data.samples.push(sample)
-                        }
-                        WorkerEvent::SerialEvent(event) => {
-                            self.latency_graph_data.serial_events.push(event)
-                        }
-                    }
+                    ActiveStream::update_from_event(
+                        &mut self.errors,
+                        &mut self.latest_payload,
+                        &mut self.latest_payload_size,
+                        &mut self.latency_graph_data,
+                        event,
+                    );
                 }
             }
         }
@@ -290,16 +315,13 @@ impl ActiveStream {
 
     pub fn update_from_events(&mut self, events: Vec<WorkerEvent>) {
         for event in events {
-            match event {
-                WorkerEvent::ErrorEvent(err) => self.errors.push(err),
-                WorkerEvent::LatencySampleEvent(sample, latest_payload) => {
-                    self.latest_payload = latest_payload;
-                    self.latency_graph_data.samples.push(sample)
-                }
-                WorkerEvent::SerialEvent(event) => {
-                    self.latency_graph_data.serial_events.push(event)
-                }
-            }
+            ActiveStream::update_from_event(
+                &mut self.errors,
+                &mut self.latest_payload,
+                &mut self.latest_payload_size,
+                &mut self.latency_graph_data,
+                event,
+            );
         }
         self.purge_old_data(Duration::from_secs(60 * 5), 20)
     }
@@ -316,6 +338,10 @@ impl ActiveStream {
 
     pub fn latency_graph_data(&self) -> &LatencyGraphData {
         &self.latency_graph_data
+    }
+
+    pub fn latest_payload_size(&self) -> Option<usize> {
+        self.latest_payload_size
     }
 
     pub fn latest_payload(&self) -> Option<&str> {
