@@ -137,21 +137,19 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
 
     fn view(&self, state: &Self::State) -> Element<Self::Event, Theme, Renderer> {
         iced::widget::stack([
-            iced::widget::responsive(|size| {
-                container(
-                    svg(svg::Handle::from_memory(include_bytes!(
-                        "../../assets/splash_start.svg"
-                    )))
-                    .width(size.width)
-                    .height(size.width / 2.0)
-                    .content_fit(iced::ContentFit::Cover)
-                    .opacity(0.8),
-                )
-                .align_y(iced::alignment::Vertical::Bottom)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into()
-            })
+            container(
+                svg(svg::Handle::from_memory(include_bytes!(
+                    "../../assets/splash_start.svg"
+                )))
+                .width(900)
+                .height(450)
+                .content_fit(iced::ContentFit::Cover)
+                .opacity(0.8),
+            )
+            .align_x(iced::alignment::Horizontal::Right)
+            .align_y(iced::alignment::Vertical::Bottom)
+            .width(Length::Fill)
+            .height(Length::Fill)
             .into(),
             container(
                 column([
