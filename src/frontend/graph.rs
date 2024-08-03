@@ -221,22 +221,18 @@ impl<Message> canvas::Program<Message> for Graph<'_> {
             }
 
             for serial_event in &data.serial_events {
-                let x = time_to_x(&serial_event.timestamp.elapsed());
-                frame.stroke(
-                    &Path::line(
-                        Point { x, y: 0.0 },
+                frame.fill(
+                    &Path::circle(
                         Point {
-                            x,
-                            y: frame.height() - TEXT_LABEL_HEIGHT - MAJOR_GRID_LINE_THICKNESS,
+                            x: time_to_x(&serial_event.timestamp.elapsed()),
+                            y: frame.height()
+                                - MAJOR_GRID_LINE_THICKNESS
+                                - TEXT_LABEL_HEIGHT
+                                - DATA_POINT_RADIUS / 2.0,
                         },
+                        DATA_POINT_RADIUS,
                     ),
-                    canvas::stroke::Stroke {
-                        style: canvas::Style::Solid(
-                            palette.secondary.strong.color.scale_alpha(0.4),
-                        ),
-                        width: DATA_POINT_LINE_THICKNESS,
-                        ..Default::default()
-                    },
+                    palette.primary.weak.color,
                 );
             }
 
