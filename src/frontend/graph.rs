@@ -35,7 +35,7 @@ pub fn graph<'a>(active_stream: &'a ActiveStream) -> Graph<'a> {
 }
 
 impl<'a, Message: Clone> Component<Message> for Graph<'a> {
-    type State = GraphProgramState;
+    type State = ();
 
     type Event = GraphEvent;
 
