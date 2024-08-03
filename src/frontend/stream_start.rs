@@ -136,119 +136,138 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
     }
 
     fn view(&self, state: &Self::State) -> Element<Self::Event, Theme, Renderer> {
-        container(
-            column([
-                text("Ready to get started?")
-                    .style(|theme: &iced::Theme| text::Style {
-                        color: Some(theme.palette().text),
-                    })
-                    .size(32)
-                    .into(),
-                row([
-                    pick_list(
-                        state.serial_ports.clone(), // TODO: would be good to not clone this all the time but compiler errors...
-                        state.selected_serial_port.clone(), // TODO: this too
-                        StreamStartEvent::SerialPortPicked,
-                    )
-                    .placeholder("Serial port")
-                    .padding(8)
-                    .width(300)
-                    .style(rounded_pick_list_style)
-                    .into(),
-                    icon_button(
-                        include_bytes!("../../assets/icon_refresh.svg"),
-                        "Refresh ports",
-                        Some(StreamStartEvent::RefreshSerialPorts),
-                        super::utils::RoundedButtonVariant::Secondary,
-                    )
-                    .into(),
-                    icon_button(
-                        include_bytes!("../../assets/icon_play_circle.svg"),
-                        "Start stream",
-                        state
-                            .selected_serial_port
-                            .is_some()
-                            .then_some(StreamStartEvent::StartStream),
-                        super::utils::RoundedButtonVariant::Secondary,
-                    )
+        iced::widget::stack([
+            iced::widget::responsive(|size| {
+                container(
+                    svg(svg::Handle::from_memory(include_bytes!(
+                        "../../assets/splash_start.svg"
+                    )))
+                    .width(size.width)
+                    .height(size.width / 2.0)
+                    .content_fit(iced::ContentFit::Cover)
+                    .opacity(0.8),
+                )
+                .align_y(iced::alignment::Vertical::Bottom)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
+            })
+            .into(),
+            container(
+                column([
+                    text("Ready to get started?")
+                        .style(|theme: &iced::Theme| text::Style {
+                            color: Some(theme.palette().text),
+                        })
+                        .size(32)
+                        .into(),
+                    row([
+                        pick_list(
+                            state.serial_ports.clone(), // TODO: would be good to not clone this all the time but compiler errors...
+                            state.selected_serial_port.clone(), // TODO: this too
+                            StreamStartEvent::SerialPortPicked,
+                        )
+                        .placeholder("Serial port")
+                        .padding(8)
+                        .width(300)
+                        .style(rounded_pick_list_style)
+                        .into(),
+                        icon_button(
+                            include_bytes!("../../assets/icon_refresh.svg"),
+                            "Refresh ports",
+                            Some(StreamStartEvent::RefreshSerialPorts),
+                            super::utils::RoundedButtonVariant::Secondary,
+                        )
+                        .into(),
+                        icon_button(
+                            include_bytes!("../../assets/icon_play_circle.svg"),
+                            "Start stream",
+                            state
+                                .selected_serial_port
+                                .is_some()
+                                .then_some(StreamStartEvent::StartStream),
+                            super::utils::RoundedButtonVariant::Secondary,
+                        )
+                        .into(),
+                    ])
+                    .spacing(4)
                     .into(),
                 ])
-                .spacing(4)
-                .into(),
-            ])
-            .push_maybe(self.error.map(|error| {
-                container(
-                    row([
-                        container(
-                            svg(svg::Handle::from_memory(include_bytes!(
-                                "../../assets/icon_error.svg"
-                            )))
-                            .style(|theme: &Theme, _| svg::Style {
-                                color: Some(theme.palette().danger),
-                            })
-                            .content_fit(iced::ContentFit::Fill),
-                        )
-                        .width(24)
-                        .height(24)
-                        .into(),
-                        text(error).style(text::danger).into(),
-                    ])
-                    .align_items(Alignment::Center)
-                    .spacing(8),
-                )
-                .style(|theme: &iced::Theme| container::Style {
-                    background: None,
-                    text_color: None,
-                    shadow: Shadow::default(),
-                    border: Border {
-                        color: theme.palette().danger,
-                        width: 1.0,
-                        radius: 999.into(),
-                    },
-                })
-                .padding([8, 16])
-            }))
-            .push_maybe(self.profile_is_dirty.then(|| {
-                container(
-                    row([
-                        container(
-                            svg(svg::Handle::from_memory(include_bytes!(
-                                "../../assets/icon_warning.svg"
-                            )))
-                            .style(|theme: &Theme, _| svg::Style {
-                                color: Some(theme.palette().danger),
-                            })
-                            .content_fit(iced::ContentFit::Fill),
-                        )
-                        .width(24)
-                        .height(24)
-                        .into(),
-                        text("The profile has not been saved yet.")
-                            .style(text::danger)
+                .push_maybe(self.error.map(|error| {
+                    container(
+                        row([
+                            container(
+                                svg(svg::Handle::from_memory(include_bytes!(
+                                    "../../assets/icon_error.svg"
+                                )))
+                                .style(|theme: &Theme, _| svg::Style {
+                                    color: Some(theme.palette().danger),
+                                })
+                                .content_fit(iced::ContentFit::Fill),
+                            )
+                            .width(24)
+                            .height(24)
                             .into(),
-                    ])
-                    .align_items(Alignment::Center)
-                    .spacing(8),
-                )
-                .style(|theme: &iced::Theme| container::Style {
-                    background: None,
-                    text_color: None,
-                    shadow: Shadow::default(),
-                    border: Border {
-                        color: theme.palette().danger,
-                        width: 1.0,
-                        radius: 999.into(),
-                    },
-                })
-                .padding([8, 16])
-            }))
-            .spacing(16)
-            .align_items(Alignment::Center),
-        )
-        .align_y(iced::alignment::Vertical::Center)
-        .align_x(iced::alignment::Horizontal::Center)
-        .width(Length::Fill)
-        .height(Length::Fill)
+                            text(error).style(text::danger).into(),
+                        ])
+                        .align_items(Alignment::Center)
+                        .spacing(8),
+                    )
+                    .style(|theme: &iced::Theme| container::Style {
+                        background: None,
+                        text_color: None,
+                        shadow: Shadow::default(),
+                        border: Border {
+                            color: theme.palette().danger,
+                            width: 1.0,
+                            radius: 999.into(),
+                        },
+                    })
+                    .padding([8, 16])
+                }))
+                .push_maybe(self.profile_is_dirty.then(|| {
+                    container(
+                        row([
+                            container(
+                                svg(svg::Handle::from_memory(include_bytes!(
+                                    "../../assets/icon_warning.svg"
+                                )))
+                                .style(|theme: &Theme, _| svg::Style {
+                                    color: Some(theme.palette().danger),
+                                })
+                                .content_fit(iced::ContentFit::Fill),
+                            )
+                            .width(24)
+                            .height(24)
+                            .into(),
+                            text("The profile has not been saved yet.")
+                                .style(text::danger)
+                                .into(),
+                        ])
+                        .align_items(Alignment::Center)
+                        .spacing(8),
+                    )
+                    .style(|theme: &iced::Theme| container::Style {
+                        background: None,
+                        text_color: None,
+                        shadow: Shadow::default(),
+                        border: Border {
+                            color: theme.palette().danger,
+                            width: 1.0,
+                            radius: 999.into(),
+                        },
+                    })
+                    .padding([8, 16])
+                }))
+                .spacing(16)
+                .align_items(Alignment::Center),
+            )
+            .align_y(iced::alignment::Vertical::Center)
+            .align_x(iced::alignment::Horizontal::Center)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into(),
+        ])
         .into()
     }
 

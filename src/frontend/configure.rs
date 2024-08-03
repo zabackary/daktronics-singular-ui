@@ -1,9 +1,9 @@
 use iced::{
     widget::{
-        checkbox, column, component, container, horizontal_rule, pick_list, row, scrollable, text,
-        text_input, Component,
+        checkbox, column, component, container, horizontal_rule, pick_list, row, scrollable, svg,
+        text, text_input, Component,
     },
-    Element, Length, Renderer, Size, Theme,
+    Border, Element, Length, Renderer, Size, Theme,
 };
 
 use crate::backend::{
@@ -192,14 +192,60 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                     .into()
                 }))
                 .spacing(8)
-                .into(),
+                .into()
+            ])
+            .push_maybe(self.profile.mapping.items.is_empty().then(|| {
+                column([
+                    text("You don't have any mappings yet.").into(),
+                    container(
+                        row([
+                            container(
+                                svg(svg::Handle::from_memory(include_bytes!(
+                                    "../../assets/icon_question_mark.svg"
+                                )))
+                                .style(|theme: &Theme, _| svg::Style {
+                                    color: Some(theme.palette().primary),
+                                })
+                                .content_fit(iced::ContentFit::Fill),
+                            )
+                            .width(24)
+                            .height(24)
+                            .into(),
+                            column([
+                                text("What's a mapping?")
+                                    .style(text::primary)
+                                    .into(),
+                                    text("A mapping converts the map of data produced from the control console into a format intended for your Singular composition. Daktronics Singular UI provides transformations useful for parsing times and period names to help you convert the raw data into the right type of text. Press the button below to create a new one.")
+                                        .into(),
+                            ]).into()
+                        ])
+                        .align_items(iced::Alignment::Center)
+                        .spacing(8),
+                    )
+                    .style(|theme: &iced::Theme| container::Style {
+                        background: None,
+                        text_color: None,
+                        shadow: Default::default(),
+                        border: Border {
+                            color: theme.palette().primary,
+                            width: 1.0,
+                            radius: 18.into(),
+                        },
+                    })
+                    .padding([8, 16])
+                    .into()
+                ])
+                .spacing(8)
+                .align_items(iced::Alignment::Center)
+                .width(Length::Fill)
+            }))
+            .push(
                 container(
                     rounded_button("New mapping", super::utils::RoundedButtonVariant::Secondary)
                     .on_press(ConfigureEvent::MappingItemAdded)
                 )
                 .center_x(Length::Fill)
-                .into()
-            ])
+            )
             .spacing(8)
             .padding(16)
             .width(Length::Fill),
