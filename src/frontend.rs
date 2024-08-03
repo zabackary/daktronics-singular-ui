@@ -27,6 +27,7 @@ pub struct DaktronicsSingularUiApp {
     pub profile: Profile,
     pub profile_dirty: bool,
     pub dark_mode: bool,
+    sport_type_keys: Vec<String>,
 }
 
 fn use_dark_mode() -> bool {
@@ -40,6 +41,7 @@ impl Default for DaktronicsSingularUiApp {
             profile_dirty: false,
             profile: Default::default(),
             dark_mode: use_dark_mode(),
+            sport_type_keys: vec![],
         }
     }
 }
@@ -306,7 +308,12 @@ impl DaktronicsSingularUiApp {
                 match event {
                     ConfigureEvent::DataStreamUrlUpdated(new) => self.profile.data_stream_url = new,
                     ConfigureEvent::SubcompNameUpdated(new) => self.profile.subcomp_name = new,
-                    ConfigureEvent::SportTypeUpdated(new) => self.profile.sport_type = Some(new),
+                    ConfigureEvent::SportTypeUpdated(new) => {
+                        self.sport_type_keys = new
+                            .all_serialized_keys()
+                            .expect("failed to get key list for sport");
+                        self.profile.sport_type = Some(new)
+                    }
                     ConfigureEvent::MultipleRequestsUpdated(new) => {
                         self.profile.multiple_requests = new
                     }
@@ -473,9 +480,12 @@ impl DaktronicsSingularUiApp {
                 )
                 .into(),
                 match &self.screen {
-                    Screen::Configure => {
-                        configure(&self.profile, Message::HandleConfigureEvent).into()
-                    }
+                    Screen::Configure => configure(
+                        &self.profile,
+                        &self.sport_type_keys,
+                        Message::HandleConfigureEvent,
+                    )
+                    .into(),
                     Screen::Stream(active_stream) => {
                         stream_running(active_stream, Message::ClearStreamErrors).into()
                     }

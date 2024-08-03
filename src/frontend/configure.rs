@@ -16,16 +16,19 @@ use super::utils::{
 
 pub struct Configure<'a, Message> {
     profile: &'a Profile,
+    sport_type_keys: &'a Vec<String>,
     on_event: Box<dyn Fn(ConfigureEvent) -> Message>,
 }
 
 impl<'a, Message> Configure<'a, Message> {
     pub fn new(
         profile: &'a Profile,
+        sport_type_keys: &'a Vec<String>,
         on_event: impl Fn(ConfigureEvent) -> Message + 'static,
     ) -> Configure<'a, Message> {
         Configure {
             profile,
+            sport_type_keys,
             on_event: Box::new(on_event),
         }
     }
@@ -48,9 +51,10 @@ pub enum ConfigureEvent {
 
 pub fn configure<'a, Message>(
     profile: &'a Profile,
+    sport_type_keys: &'a Vec<String>,
     on_event: impl Fn(ConfigureEvent) -> Message + 'static,
 ) -> Configure<'a, Message> {
-    Configure::new(&profile, on_event)
+    Configure::new(&profile, &sport_type_keys, on_event)
 }
 
 impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
@@ -159,15 +163,22 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                         )
                         .map(move |_| ConfigureEvent::MappingItemEnabledUpdated(i, !item.enabled))
                         .into(),
-                        text_input(
-                            "Source field",
-                            &item.source_field
+                        pick_list(
+                            self.sport_type_keys.as_ref(),
+                            Some(&item.source_field),
+                            move |new| ConfigureEvent::MappingItemSourceFieldUpdated(i, new)
                         )
                         .width(Length::Fill)
                         .padding(8)
-                        .on_input(move |new| ConfigureEvent::MappingItemSourceFieldUpdated(i, new))
-                        .style(rounded_text_input_style)
+                        .style(rounded_pick_list_style)
                         .into(),
+                        // It would be nice to use a combo box, but combo box
+                        // requires external state to be stored. This could be
+                        // extracted into a Component but there are lifetime
+                        // issues when a Component's State is borrowed in its
+                        // view method.
+                        //
+                        // See https://discourse.iced.rs/t/lifetime-problems-when-using-iced-component/383
                         pick_list(
                             Transformation::ALL,
                             Some(item.transformation),
