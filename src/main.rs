@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use frontend::{DaktronicsSingularUiApp, Screen};
 use iced::{theme::Palette, window::icon, Color, Font, Size};
 
