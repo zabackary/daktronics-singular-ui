@@ -7,6 +7,10 @@
   <img src="https://gist.githubusercontent.com/hecrj/ad7ecd38f6e47ff3688a38c79fd108f0/raw/74384875ecbad02ae2a926425e9bcafd0695bade/color.svg" width="130px">
 </a>
 
+## Demo video
+
+[daktronics-singular-ui-demo.webm](https://github.com/user-attachments/assets/473b455a-af18-4af5-89aa-710fdfc68522)
+
 ## Setup
 
 To build from source, make sure you have a Rust toolchain installed, then do:
