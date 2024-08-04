@@ -206,6 +206,13 @@ impl DaktronicsSingularUiApp {
                 }
             }),
             Message::ImportProfileFinished(profile) => {
+                if let Some(sport_type) = profile.sport_type {
+                    self.sport_type_keys = sport_type
+                        .all_serialized_keys()
+                        .expect("failed to get key list for sport");
+                } else {
+                    self.sport_type_keys.clear();
+                }
                 self.profile = profile;
                 self.profile_dirty = false;
                 self.screen = Screen::Configure;
@@ -232,6 +239,7 @@ impl DaktronicsSingularUiApp {
             }
             Message::NewProfile => {
                 self.profile = Profile::default();
+                self.sport_type_keys.clear();
                 self.profile_dirty = false;
                 Task::none()
             }
