@@ -14,6 +14,7 @@ use super::utils::{icon_button, rounded_button, rounded_text_input_style};
 #[derive(Debug, Clone)]
 pub enum HeaderScreen {
     Configure,
+    SetUp,
     Stream,
 }
 
@@ -267,6 +268,21 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                         .on_press_maybe(
                             self.enabled
                                 .then_some(HeaderEvent::ScreenTabClicked(HeaderScreen::Configure)),
+                        )
+                        .into(),
+                    button(text("Set up"))
+                        .style(|theme, status| {
+                            tab_button_style(
+                                theme,
+                                status,
+                                [0.0, 0.0, 0.0, 0.0],
+                                matches!(self.screen, HeaderScreen::SetUp),
+                            )
+                        })
+                        .padding([10, 14])
+                        .on_press_maybe(
+                            self.enabled
+                                .then_some(HeaderEvent::ScreenTabClicked(HeaderScreen::SetUp)),
                         )
                         .into(),
                     button(text("Stream"))
