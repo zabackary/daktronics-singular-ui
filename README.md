@@ -13,6 +13,17 @@
 
 ## Setup
 
+### Binaries
+
+Grab the binaries from the [GitHub releases page](https://github.com/zabackary/daktronics-singular-ui/releases/tag/v1.0.0).
+For now, a Linux binary and Windows binary are provided. Daktronics Singular UI
+is highly portable, so a MacOS version is possible. However, [Apple does not make
+cross-compiling easy](https://users.rust-lang.org/t/is-cross-compile-from-linux-to-mac-supported/95105)
+and I don't own a MacOS machine (I do have an old Mac Mini, so I might turn that
+into a build server, but no promises).
+
+### From source
+
 To build from source, make sure you have a Rust toolchain installed, then do:
 
 ```bash
