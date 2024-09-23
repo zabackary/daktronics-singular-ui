@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use configure::{configure, ConfigureEvent};
 use header::{header, HeaderScreen};
-use iced::widget::{column, container, row, svg, text, text_input};
+use iced::widget::{column, container, row, scrollable, svg, text, text_input};
 use iced::{Alignment, Element, Length, Subscription, Task};
 use stream_running::stream_running;
 use stream_start::stream_start;
@@ -526,76 +526,78 @@ impl DaktronicsSingularUiApp {
                     )
                     .into(),
                     Screen::SetUp(public_token) => container(
-                        rounded_pane(
-                            column([
-                                text("Let's get set up.")
-                                    .style(|theme: &iced::Theme| text::Style {
-                                        color: Some(theme.palette().text),
-                                    })
-                                    .size(32)
-                                    .into(),
-                                text("You only need to do this once per composition.")
-                                    .style(|theme: &iced::Theme| text::Style {
-                                        color: Some(theme.palette().text),
-                                    })
-                                    .size(16)
-                                    .into(),
-                                text("Step 1: Find your public data stream token at app.singular.live/datastreammanager and copy it. Make sure it corresponds with the private token you entered.")
-                                    .width(Length::Fill)
-                                    .into(),
-                                container(
-                                    rounded_button("Open data stream manager", utils::RoundedButtonVariant::Secondary)
-                                    .on_press(Message::SetUpOpenDataStreams),
-                                )
-                                .width(Length::Fill)
-                                .align_x(iced::alignment::Horizontal::Right)
-                                .into(),
-                                text("Step 2: Paste it here and press the copy button to copy the root composition script to your clipboard.")
-                                    .width(Length::Fill)
-                                    .into(),
-                                row([
-                                    text_input(
-                                        "Your public data stream token",
-                                        &public_token
+                        scrollable(
+                            rounded_pane(
+                                column([
+                                    text("Let's get set up.")
+                                        .style(|theme: &iced::Theme| text::Style {
+                                            color: Some(theme.palette().text),
+                                        })
+                                        .size(32)
+                                        .into(),
+                                    text("You only need to do this once per composition.")
+                                        .style(|theme: &iced::Theme| text::Style {
+                                            color: Some(theme.palette().text),
+                                        })
+                                        .size(16)
+                                        .into(),
+                                    text("Step 1: Find your public data stream token at app.singular.live/datastreammanager and copy it. Make sure it corresponds with the private token you entered.")
+                                        .width(Length::Fill)
+                                        .into(),
+                                    container(
+                                        rounded_button("Open data stream manager", utils::RoundedButtonVariant::Secondary)
+                                        .on_press(Message::SetUpOpenDataStreams),
                                     )
                                     .width(Length::Fill)
-                                    .style(rounded_text_input_style)
-                                    .on_input(Message::SetUpTokenUpdated)
-                                    .padding(8)
+                                    .align_x(iced::alignment::Horizontal::Right)
                                     .into(),
-                                    icon_button(
-                                        include_bytes!("../assets/icon_content_copy.svg"),
-                                        "Copy root composition script",
-                                        Some(Message::SetUpCopyScript),
-                                        utils::RoundedButtonVariant::Primary
-                                    ).into()
+                                    text("Step 2: Paste it here and press the copy button to copy the root composition script to your clipboard.")
+                                        .width(Length::Fill)
+                                        .into(),
+                                    row([
+                                        text_input(
+                                            "Your public data stream token",
+                                            &public_token
+                                        )
+                                        .width(Length::Fill)
+                                        .style(rounded_text_input_style)
+                                        .on_input(Message::SetUpTokenUpdated)
+                                        .padding(8)
+                                        .into(),
+                                        icon_button(
+                                            include_bytes!("../assets/icon_content_copy.svg"),
+                                            "Copy root composition script",
+                                            Some(Message::SetUpCopyScript),
+                                            utils::RoundedButtonVariant::Primary
+                                        ).into()
+                                    ])
+                                    .spacing(4)
+                                    .into(),
+                                    text("Step 3: Head over to app.singular.live/dashboard. Right click on the composition and select \"Open script editor\".")
+                                        .width(Length::Fill)
+                                        .into(),
+                                    container(
+                                        rounded_button("Open dashboard", utils::RoundedButtonVariant::Secondary)
+                                        .on_press(Message::SetUpOpenDashboard),
+                                    )
+                                    .width(Length::Fill)
+                                    .align_x(iced::alignment::Horizontal::Right)
+                                    .into(),
+                                    text("Step 4: Press the plus button in the tabs at the top left. Click \"Root composition\".")
+                                        .width(Length::Fill)
+                                        .into(),
+                                    text("Step 5: Paste the composition script from your clipboard and save the script (Ctrl + S).")
+                                        .width(Length::Fill)
+                                        .into(),
+                                    text("Step 6 (optional): Try setting up a stream to test whether it worked.")
+                                        .width(Length::Fill)
+                                        .into(),
                                 ])
-                                .spacing(4)
-                                .into(),
-                                text("Step 3: Head over to app.singular.live/dashboard. Right click on the composition and select \"Open script editor\".")
-                                    .width(Length::Fill)
-                                    .into(),
-                                container(
-                                    rounded_button("Open dashboard", utils::RoundedButtonVariant::Secondary)
-                                    .on_press(Message::SetUpOpenDashboard),
-                                )
-                                .width(Length::Fill)
-                                .align_x(iced::alignment::Horizontal::Right)
-                                .into(),
-                                text("Step 4: Press the plus button in the tabs at the top left. Click \"Root composition\".")
-                                    .width(Length::Fill)
-                                    .into(),
-                                text("Step 5: Paste the composition script from your clipboard and save the script (Ctrl + S).")
-                                    .width(Length::Fill)
-                                    .into(),
-                                text("Step 6 (optional): Try setting up a stream to test whether it worked.")
-                                    .width(Length::Fill)
-                                    .into(),
-                            ])
-                            .spacing(8)
-                            .width(500)
-                            .padding(12)
-                            .align_items(Alignment::Center)
+                                .spacing(8)
+                                .width(500)
+                                .padding(12)
+                                .align_items(Alignment::Center)
+                            )
                         )
                     )
                     .align_y(iced::alignment::Vertical::Center)
