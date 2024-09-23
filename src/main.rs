@@ -5,6 +5,7 @@ use std::{
     path::PathBuf,
 };
 
+use backend::stream::ActiveStream;
 use clap::Parser;
 use frontend::{DaktronicsSingularUiApp, Screen};
 use iced::{theme::Palette, window::icon, Color, Font, Size};
@@ -22,18 +23,19 @@ struct Args {
     #[arg(short = 'l', long, default_value_t = false)]
     headless: bool,
 
-    /// The configuration file. If not provided, the UI will prompt for one.
+    /// The profile configuration file path. If not provided, the UI will prompt
+    /// for one.
     #[arg(short, long)]
-    config_file: Option<PathBuf>,
+    profile: Option<PathBuf>,
 
-    /// Whether to start the stream immediately. Must be used with --config-file
+    /// Whether to start the stream immediately. Must be used with --profile
     /// and --serial-path.
     #[arg(short, long, default_value_t = false)]
     start: bool,
 
-    /// What serial path (e.g. /dev/xxx or COM1 on Windows) to use. If not
-    /// provided, the UI will prompt for one.
-    #[arg(short = 'p', long)]
+    /// What serial path (e.g. /dev/xxx or COM1 on Windows) to use, when --start
+    /// is used.
+    #[arg(short = 'e', long)]
     serial_path: Option<String>,
 }
 
@@ -41,6 +43,9 @@ enum DSUError {
     Iced(iced::Error),
     HeadlessWithoutStart,
     StartWithoutConfigSerial,
+    ProfileFileRead(std::io::Error),
+    ProfileFileParse(serde_json::Error),
+    HeadlessNotSupported,
 }
 
 impl Display for DSUError {
@@ -52,6 +57,15 @@ impl Display for DSUError {
                 f,
                 "cannot start automatically without a config file and serial path"
             ),
+            Self::ProfileFileRead(io_error) => {
+                write!(f, "failed to open profile file: {}", io_error)
+            }
+            Self::ProfileFileParse(serde_error) => {
+                write!(f, "failed to parse profile file: {}", serde_error)
+            }
+            Self::HeadlessNotSupported => {
+                write!(f, "headless mode is not supported yet")
+            }
         }
     }
 }
@@ -83,8 +97,11 @@ fn main() -> Result<(), DSUError> {
     if args.headless && !args.start {
         return Err(DSUError::HeadlessWithoutStart);
     }
-    if args.start && (args.serial_path.is_none() || args.config_file.is_none()) {
+    if args.start && (args.serial_path.is_none() || args.profile.is_none()) {
         return Err(DSUError::StartWithoutConfigSerial);
+    }
+    if args.headless {
+        return Err(DSUError::HeadlessNotSupported);
     }
 
     let program_icon = image::load_from_memory_with_format(
@@ -95,6 +112,16 @@ fn main() -> Result<(), DSUError> {
     .to_rgba8();
     let program_icon_width = program_icon.width();
     let program_icon_height = program_icon.height();
+
+    let profile: backend::profile::Profile = if args.profile.is_some() {
+        serde_json::from_str(
+            &std::fs::read_to_string(args.profile.as_deref().unwrap())
+                .map_err(DSUError::ProfileFileRead)?,
+        )
+        .map_err(DSUError::ProfileFileParse)?
+    } else {
+        Default::default()
+    };
 
     iced::application(
         |app: &DaktronicsSingularUiApp| {
@@ -150,6 +177,37 @@ fn main() -> Result<(), DSUError> {
             },
         )
     })
-    .run()
+    .run_with(move || {
+        let mut immediately_exit = false;
+        let screen = if args.start {
+            match ActiveStream::new(
+                profile.clone(),
+                args.serial_path.as_ref().expect("no tty path").clone(),
+            ) {
+                Ok(stream) => frontend::Screen::Stream(stream),
+                Err(err) => {
+                    eprintln!("couldn't start stream: {}", err);
+                    immediately_exit = true;
+                    frontend::Screen::Welcome
+                }
+            }
+        } else if args.profile.is_some() {
+            frontend::Screen::Configure
+        } else {
+            Default::default()
+        };
+        (
+            DaktronicsSingularUiApp {
+                profile: profile.clone(),
+                screen,
+                ..Default::default()
+            },
+            if immediately_exit {
+                iced::exit()
+            } else {
+                iced::Task::none()
+            },
+        )
+    })
     .map_err(DSUError::Iced)
 }

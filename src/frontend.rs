@@ -27,7 +27,7 @@ pub struct DaktronicsSingularUiApp {
     pub profile: Profile,
     pub profile_dirty: bool,
     pub dark_mode: bool,
-    sport_type_keys: Vec<String>,
+    pub sport_type_keys: Vec<String>,
 }
 
 fn use_dark_mode() -> bool {
