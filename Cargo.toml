@@ -11,8 +11,9 @@ clap = { version = "^4.5.18", features = ["derive"] }
 daktronics-allsport-5000 = { version = "^0.3.1", features = ["serde"] }
 dark-light = "^1.1.1"
 filenamify = "0.1.1"
-image = "^0.25.2"
+image = { version = "^0.25.2", default-features = false, features = ["png"] }
 open = "^5.3.0"
+openssl = { version = "^0.10.66", features = ["vendored"] }
 reqwest = { version = "^0.12.5", features = ["json"] }
 rfd = "^0.14.1"
 serde = { version = "^1.0.204", features = ["derive"] }
