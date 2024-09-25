@@ -15,7 +15,7 @@
 
 ### Binaries
 
-Grab the binaries from the [GitHub releases page](https://github.com/zabackary/daktronics-singular-ui/releases/tag/v1.0.0).
+Grab the binaries from the [GitHub releases page](https://github.com/zabackary/daktronics-singular-ui/releases).
 For now, a Linux binary and Windows binary are provided. Daktronics Singular UI
 is highly portable, so a MacOS version is possible. However, [Apple does not make
 cross-compiling easy](https://users.rust-lang.org/t/is-cross-compile-from-linux-to-mac-supported/95105)
