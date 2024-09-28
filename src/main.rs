@@ -37,6 +37,10 @@ struct Args {
     /// is used.
     #[arg(short = 'e', long)]
     serial_path: Option<String>,
+
+    /// Whether to start the program in fullscreen mode.
+    #[arg(short, long, default_value_t = false)]
+    fullscreen: bool,
 }
 
 enum DSUError {
@@ -150,6 +154,7 @@ fn main() -> Result<(), DSUError> {
             )
             .expect("failed to construct static program icon"),
         ),
+        decorations: !args.fullscreen,
         ..Default::default()
     })
     .font(include_bytes!("../assets/FiraSans-Regular.ttf"))
@@ -202,11 +207,23 @@ fn main() -> Result<(), DSUError> {
                 screen,
                 ..Default::default()
             },
-            if immediately_exit {
-                iced::exit()
-            } else {
-                iced::Task::none()
-            },
+            iced::Task::batch([
+                if args.fullscreen {
+                    iced::window::get_latest().then(|id| {
+                        iced::window::change_mode(
+                            id.expect("no window latest"),
+                            iced::window::Mode::Fullscreen,
+                        )
+                    })
+                } else {
+                    iced::Task::none()
+                },
+                if immediately_exit {
+                    iced::exit()
+                } else {
+                    iced::Task::none()
+                },
+            ]),
         )
     })
     .map_err(DSUError::Iced)
