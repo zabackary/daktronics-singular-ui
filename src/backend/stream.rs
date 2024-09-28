@@ -131,7 +131,7 @@ impl ActiveStream {
                             }
                             Err(err) => worker_event_tx
                                 .send(WorkerEvent::ErrorEvent(
-                                    format!("couldn't serialize sport: {err}").into(),
+                                    format!("couldn't serialize sport: {err}\nThis might be caused by the DSU sport type not matching the Daktronics sport type").into(),
                                 ))
                                 .await
                                 .expect("worker event tx closed!"),
