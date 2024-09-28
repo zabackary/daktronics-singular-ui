@@ -223,6 +223,11 @@ fn main() -> Result<(), DSUError> {
                 } else {
                     iced::Task::none()
                 },
+                if args.start {
+                    iced::Task::done(frontend::Message::UpdateStreamStats)
+                } else {
+                    iced::Task::none()
+                },
             ]),
         )
     })
