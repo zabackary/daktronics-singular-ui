@@ -4,7 +4,7 @@ use iced::{
         button, column, component, container, horizontal_space, row, svg, text, text_input,
         vertical_space, Component, Space,
     },
-    Border, Color, Element, Length, Renderer, Shadow, Size, Theme,
+    Border, Color, Element, Length, Padding, Renderer, Shadow, Size, Theme,
 };
 
 use crate::APP_NAME;
@@ -249,7 +249,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                     )
                     .into(),
                 ])
-                .align_items(iced::Alignment::Center)
+                .align_y(iced::Alignment::Center)
                 .padding(14)
                 .spacing(4)
                 .width(Length::Fill)
@@ -260,7 +260,12 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                             tab_button_style(
                                 theme,
                                 status,
-                                [256.0, 0.0, 0.0, 256.0],
+                                Radius {
+                                    top_left: 256.0,
+                                    bottom_left: 256.0,
+                                    top_right: 0.0,
+                                    bottom_right: 0.0,
+                                },
                                 matches!(self.screen, HeaderScreen::Configure),
                             )
                         })
@@ -275,7 +280,12 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                             tab_button_style(
                                 theme,
                                 status,
-                                [0.0, 0.0, 0.0, 0.0],
+                                Radius {
+                                    top_left: 0.0,
+                                    bottom_left: 0.0,
+                                    top_right: 0.0,
+                                    bottom_right: 0.0,
+                                },
                                 matches!(self.screen, HeaderScreen::SetUp),
                             )
                         })
@@ -290,7 +300,12 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                             tab_button_style(
                                 theme,
                                 status,
-                                [0.0, 256.0, 256.0, 0.0],
+                                Radius {
+                                    top_right: 256.0,
+                                    bottom_right: 256.0,
+                                    top_left: 0.0,
+                                    bottom_left: 0.0,
+                                },
                                 matches!(self.screen, HeaderScreen::Stream),
                             )
                         })
@@ -334,7 +349,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                                 .into(),
                             ]
                         })
-                        .align_items(iced::Alignment::Center)
+                        .align_y(iced::Alignment::Center)
                         .spacing(4),
                     )
                     .style(|theme| container::Style {
@@ -347,7 +362,12 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                             radius: 999.into(),
                         },
                     })
-                    .padding([4, 4, 4, 12])
+                    .padding(Padding {
+                        left: 12.0,
+                        bottom: 4.0,
+                        right: 4.0,
+                        top: 4.0,
+                    })
                 }))
                 .into(),
                 vertical_space().height(8).into(),
@@ -359,7 +379,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                 container::transparent(theme)
             } else {
                 container::transparent(theme)
-                    .with_background(theme.extended_palette().primary.weak.color.scale_alpha(0.2))
+                    .background(theme.extended_palette().primary.weak.color.scale_alpha(0.2))
             }
         })
         .into()

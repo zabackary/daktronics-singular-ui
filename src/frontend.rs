@@ -490,7 +490,7 @@ impl DaktronicsSingularUiApp {
                         .into(),
                     ])
                     .spacing(16)
-                    .align_items(Alignment::Start),
+                    .align_x(Alignment::Start),
                 )
                 .align_y(iced::alignment::Vertical::Center)
                 .align_x(iced::alignment::Horizontal::Center)
@@ -596,7 +596,7 @@ impl DaktronicsSingularUiApp {
                                 .spacing(8)
                                 .width(500)
                                 .padding(12)
-                                .align_items(Alignment::Center)
+                                .align_x(Alignment::Center)
                             )
                         )
                     )
@@ -615,7 +615,7 @@ impl DaktronicsSingularUiApp {
                     Screen::Welcome => unreachable!(),
                 },
             ])
-            .align_items(Alignment::Center)
+            .align_x(Alignment::Center)
             .into()
         }
     }

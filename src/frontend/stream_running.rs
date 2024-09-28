@@ -63,7 +63,7 @@ fn pane_header<'a, Message: 'a>(
     .push_maybe(button.is_some().then(|| horizontal_space().width(4)))
     .push_maybe(button)
     .height(64)
-    .align_items(iced::Alignment::Center)
+    .align_y(iced::Alignment::Center)
     .padding(8)
     .spacing(2)
     .into()
@@ -100,7 +100,8 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                     .height(Length::Fill)
                     .padding(16),
             )
-            .fill()
+            .width(Length::Fill)
+            .height(Length::Fill)
             .into(),
         ]);
         let payload_pane = {
@@ -125,7 +126,8 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                     .width(Length::Fill)
                     .padding(16),
                 ))
-                .fill()
+                .width(Length::Fill)
+                .height(Length::Fill)
                 .into(),
             ])
         };

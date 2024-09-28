@@ -21,9 +21,4 @@ serde_json = "^1.0.120"
 timeago = "^0.4.2"
 tokio = { version = "^1.38.0", features = ["full"] }
 tokio-serial = "^5.4.4"
-iced = { git = "https://github.com/iced-rs/iced.git", features = [
-  "tokio",
-  "lazy",
-  "svg",
-  "canvas",
-] }
+iced = { version = "^0.13.1", features = ["tokio", "lazy", "svg", "canvas"] }

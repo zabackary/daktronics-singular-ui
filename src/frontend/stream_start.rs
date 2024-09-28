@@ -208,7 +208,7 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                             .into(),
                             text(error).style(text::danger).into(),
                         ])
-                        .align_items(Alignment::Center)
+                        .align_y(Alignment::Center)
                         .spacing(8),
                     )
                     .style(|theme: &iced::Theme| container::Style {
@@ -242,7 +242,7 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                                 .style(text::danger)
                                 .into(),
                         ])
-                        .align_items(Alignment::Center)
+                        .align_y(Alignment::Center)
                         .spacing(8),
                     )
                     .style(|theme: &iced::Theme| container::Style {
@@ -258,7 +258,7 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                     .padding([8, 16])
                 }))
                 .spacing(16)
-                .align_items(Alignment::Center),
+                .align_x(Alignment::Center),
             )
             .align_y(iced::alignment::Vertical::Center)
             .align_x(iced::alignment::Horizontal::Center)

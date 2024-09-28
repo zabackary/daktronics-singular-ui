@@ -199,7 +199,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                         .into(),
                     ])
                     .spacing(8)
-                    .align_items(iced::Alignment::Center)
+                    .align_y(iced::Alignment::Center)
                     .into()
                 }))
                 .spacing(8)
@@ -230,7 +230,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                                         .into(),
                             ]).into()
                         ])
-                        .align_items(iced::Alignment::Center)
+                        .align_y(iced::Alignment::Center)
                         .spacing(8),
                     )
                     .style(|theme: &iced::Theme| container::Style {
@@ -247,7 +247,7 @@ impl<'a, Message: Clone> Component<Message> for Configure<'a, Message> {
                     .into()
                 ])
                 .spacing(8)
-                .align_items(iced::Alignment::Center)
+                .align_x(iced::Alignment::Center)
                 .width(Length::Fill)
             }))
             .push(
