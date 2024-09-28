@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use configure::{configure, ConfigureEvent};
 use header::{header, HeaderScreen};
-use iced::widget::{column, container, row, scrollable, svg, text, text_input};
+use iced::widget::{column, container, row, scrollable, svg, text, text_input, Space};
 use iced::{Alignment, Element, Length, Subscription, Task};
 use stream_running::stream_running;
 use stream_start::stream_start;
@@ -28,6 +28,7 @@ pub struct DaktronicsSingularUiApp {
     pub profile_dirty: bool,
     pub dark_mode: bool,
     pub sport_type_keys: Vec<String>,
+    pub hide_header: bool,
 }
 
 fn use_dark_mode() -> bool {
@@ -42,6 +43,7 @@ impl Default for DaktronicsSingularUiApp {
             profile: Default::default(),
             dark_mode: use_dark_mode(),
             sport_type_keys: vec![],
+            hide_header: false,
         }
     }
 }
@@ -501,23 +503,32 @@ impl DaktronicsSingularUiApp {
             .into()
         } else {
             column([
-                header(
-                    match self.screen {
-                        Screen::Configure => HeaderScreen::Configure,
-                        Screen::SetUp(_) => HeaderScreen::SetUp,
-                        Screen::Stream(_) | Screen::StreamStart(_) => HeaderScreen::Stream,
-                        Screen::Welcome => unreachable!(),
-                    },
-                    !matches!(self.screen, Screen::Stream(_)),
-                    Message::SwitchScreen,
-                    &self.profile.name,
-                    Message::ProfileNameChange,
-                    Message::TryImportProfile,
-                    Message::ExportProfile,
-                    Message::TryNewProfile,
-                    matches!(self.screen, Screen::Stream(_)).then_some(Message::EndStream),
-                )
-                .into(),
+                if self.hide_header {
+                    container(
+                        text(&self.profile.name).size(12.0)
+                    )
+                    .align_x(Alignment::Center)
+                    .padding(4.0)
+                    .into()
+                } else {
+                    header(
+                        match self.screen {
+                            Screen::Configure => HeaderScreen::Configure,
+                            Screen::SetUp(_) => HeaderScreen::SetUp,
+                            Screen::Stream(_) | Screen::StreamStart(_) => HeaderScreen::Stream,
+                            Screen::Welcome => unreachable!(),
+                        },
+                        !matches!(self.screen, Screen::Stream(_)),
+                        Message::SwitchScreen,
+                        &self.profile.name,
+                        Message::ProfileNameChange,
+                        Message::TryImportProfile,
+                        Message::ExportProfile,
+                        Message::TryNewProfile,
+                        matches!(self.screen, Screen::Stream(_)).then_some(Message::EndStream),
+                    )
+                    .into()
+                },
                 match &self.screen {
                     Screen::Configure => configure(
                         &self.profile,

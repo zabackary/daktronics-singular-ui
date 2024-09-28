@@ -41,6 +41,10 @@ struct Args {
     /// Whether to start the program in fullscreen mode.
     #[arg(short, long, default_value_t = false)]
     fullscreen: bool,
+
+    /// Whether to hide the header
+    #[arg(long, default_value_t = false)]
+    hide_header: bool,
 }
 
 enum DSUError {
@@ -145,7 +149,7 @@ fn main() -> Result<(), DSUError> {
     )
     .subscription(DaktronicsSingularUiApp::subscription)
     .window(iced::window::Settings {
-        min_size: Some(Size::new(700.0, 400.0)),
+        min_size: Some(Size::new(480.0, 320.0)),
         icon: Some(
             icon::from_rgba(
                 program_icon.into_vec(),
@@ -205,6 +209,7 @@ fn main() -> Result<(), DSUError> {
             DaktronicsSingularUiApp {
                 profile: profile.clone(),
                 screen,
+                hide_header: args.hide_header,
                 ..Default::default()
             },
             iced::Task::batch([
