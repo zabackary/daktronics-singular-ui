@@ -1,6 +1,6 @@
 use iced::{
     widget::{column, component, container, horizontal_space, row, scrollable, text, Component},
-    Element, Font, Length, Renderer, Size, Theme,
+    Element, Font, Length, Padding, Renderer, Size, Theme,
 };
 
 use crate::backend::stream::ActiveStream;
@@ -62,9 +62,13 @@ fn pane_header<'a, Message: 'a>(
     ])
     .push_maybe(button.is_some().then(|| horizontal_space().width(4)))
     .push_maybe(button)
-    .height(64)
+    .height(54)
     .align_y(iced::Alignment::Center)
-    .padding(8)
+    .padding(Padding {
+        left: 4.0,
+        right: 4.0,
+        ..Padding::ZERO
+    })
     .spacing(2)
     .into()
 }
@@ -171,7 +175,7 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
         row([latency_pane.into(), payload_pane.into()])
             .push_maybe(error_pane)
             .spacing(12)
-            .padding(16)
+            .padding(Padding::new(16.0).top(0.0))
             .width(Length::Fill)
             .height(Length::Fill)
             .into()

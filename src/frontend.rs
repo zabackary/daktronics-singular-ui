@@ -9,7 +9,8 @@ use std::path::PathBuf;
 
 use configure::{configure, ConfigureEvent};
 use header::{header, HeaderScreen};
-use iced::widget::{column, container, row, scrollable, svg, text, text_input, Space};
+use iced::border::Radius;
+use iced::widget::{column, container, horizontal_space, row, scrollable, svg, text, text_input};
 use iced::{Alignment, Element, Length, Subscription, Task};
 use stream_running::stream_running;
 use stream_start::stream_start;
@@ -505,10 +506,33 @@ impl DaktronicsSingularUiApp {
             column([
                 if self.hide_header {
                     container(
-                        text(&self.profile.name).size(12.0)
+                        row([
+                            container(
+                                svg(svg::Handle::from_memory(include_bytes!(
+                                    "../assets/logo.svg"
+                                )))
+                                .content_fit(iced::ContentFit::Fill),
+                            )
+                            .width(18)
+                            .height(18)
+                            .into(),
+                            horizontal_space().width(4.0).into(),
+                            text("Daktronics Singular UI - Streaming \"").size(12.0).into(),
+                            text(&self.profile.name).size(12.0).into(),
+                            text("\" live").size(12.0).into(),
+                        ])
+                        .align_y(Alignment::Center)
+                        .padding(4.0)
                     )
-                    .align_x(Alignment::Center)
-                    .padding(4.0)
+                    .style(|theme: &iced::Theme| {
+                        let palette = theme.extended_palette();
+                        container::Style {
+                            text_color: Some(palette.secondary.base.text),
+                            background: Some(palette.secondary.base.color.into()),
+                            border: iced::Border { color: iced::Color::TRANSPARENT, width: 0.0, radius: Radius::new(0.0).bottom(8.0) },
+                            ..Default::default()
+                        }
+                    })
                     .into()
                 } else {
                     header(
