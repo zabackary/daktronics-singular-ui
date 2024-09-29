@@ -42,9 +42,19 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     fullscreen: bool,
 
-    /// Whether to hide the header
+    /// Whether to hide the header and show a minimized video
+    ///
+    /// Useful for small display sizes
     #[arg(long, default_value_t = false)]
     hide_header: bool,
+
+    /// Enable unattended mode, restarting automatically if there are many
+    /// errors
+    ///
+    /// Passing a number indicates the maximum tolerated error count. Default 3.
+    /// Max 15.
+    #[arg(short, long, default_missing_value = "3", require_equals = true, num_args = 0..1)]
+    unattended: Option<usize>,
 }
 
 enum DSUError {
@@ -195,7 +205,7 @@ fn main() -> Result<(), DSUError> {
             ) {
                 Ok(stream) => frontend::Screen::Stream(stream),
                 Err(err) => {
-                    eprintln!("couldn't start stream: {}", err);
+                    eprintln!("ERR main Couldn't start stream: {}", err);
                     immediately_exit = true;
                     frontend::Screen::Welcome
                 }
@@ -210,6 +220,8 @@ fn main() -> Result<(), DSUError> {
                 profile: profile.clone(),
                 screen,
                 hide_header: args.hide_header,
+                initial_tty_path: args.serial_path.clone(),
+                unattended: args.unattended,
                 ..Default::default()
             },
             iced::Task::batch([

@@ -30,6 +30,8 @@ pub struct DaktronicsSingularUiApp {
     pub dark_mode: bool,
     pub sport_type_keys: Vec<String>,
     pub hide_header: bool,
+    pub unattended: Option<usize>,
+    pub initial_tty_path: Option<String>,
 }
 
 fn use_dark_mode() -> bool {
@@ -45,6 +47,8 @@ impl Default for DaktronicsSingularUiApp {
             dark_mode: use_dark_mode(),
             sport_type_keys: vec![],
             hide_header: false,
+            unattended: None,
+            initial_tty_path: None,
         }
     }
 }
@@ -309,6 +313,28 @@ impl DaktronicsSingularUiApp {
             Message::UpdateStreamStatsResponse(events) => match self.screen {
                 Screen::Stream(ref mut active_stream) => {
                     active_stream.update_from_events(events);
+                    if self.unattended.is_some()
+                        && self.initial_tty_path.is_some()
+                        && active_stream.errors().len() > self.unattended.unwrap()
+                    {
+                        eprintln!(
+                            "ERR frontend Stream will be restarted due to volume of errors ({}) exceeding configured value ({}) (unattended mode)",
+                            active_stream.errors().len(),
+                            self.unattended.unwrap()
+                        );
+                        match ActiveStream::new(
+                            self.profile.clone(),
+                            self.initial_tty_path.as_ref().expect("no tty path").clone(),
+                        ) {
+                            Ok(stream) => {
+                                self.screen = Screen::Stream(stream);
+                                eprintln!("INFO frontend Restarted stream successfully");
+                            }
+                            Err(err) => {
+                                eprintln!("ERR frontend Failed to restart stream: {}", err);
+                            }
+                        }
+                    }
                     Task::done(Message::UpdateStreamStats)
                 }
                 _ => Task::none(),
@@ -526,11 +552,26 @@ impl DaktronicsSingularUiApp {
                     )
                     .style(|theme: &iced::Theme| {
                         let palette = theme.extended_palette();
-                        container::Style {
-                            text_color: Some(palette.secondary.base.text),
-                            background: Some(palette.secondary.base.color.into()),
+                        let error_state = match &self.screen {
+                            Screen::Stream(stream) => stream.errors().len() > 0,
+                            _ => false
+                        };
+                        let base_style = container::Style {
                             border: iced::Border { color: iced::Color::TRANSPARENT, width: 0.0, radius: Radius::new(0.0).bottom(8.0) },
                             ..Default::default()
+                        };
+                        if error_state {
+                            container::Style {
+                                text_color: Some(palette.danger.base.text),
+                                background: Some(palette.danger.base.color.into()),
+                                ..base_style
+                            }
+                        } else {
+                            container::Style {
+                                text_color: Some(palette.secondary.base.text),
+                                background: Some(palette.secondary.base.color.into()),
+                                ..base_style
+                            }
                         }
                     })
                     .into()

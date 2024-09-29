@@ -7,6 +7,7 @@ use std::{
 use daktronics_allsport_5000::{sports::Sport, RTDState};
 use latency_graph::{LatencyGraphData, LatencySample, SerialEvent};
 use tokio::{
+    select,
     sync::{
         mpsc::{self, Receiver},
         Mutex,
@@ -18,6 +19,8 @@ use tokio_serial::SerialPortBuilderExt;
 use crate::APP_USER_AGENT;
 
 use super::{network::put_to_server, profile::Profile};
+
+const MAX_SERIAL_PACKET_DELAY: u64 = 3000;
 
 mod latency_graph {
     use std::time::{Duration, Instant};
@@ -77,6 +80,10 @@ pub struct ActiveStream {
 
 impl ActiveStream {
     pub fn new(profile: Profile, tty_path: String) -> Result<Self, Box<dyn Error>> {
+        eprintln!(
+            "INFO stream Creating stream bound to {} with profile {}",
+            tty_path, profile.name
+        );
         let (worker_event_tx, worker_event_rx) = mpsc::channel(255);
 
         // allow because cargo gets suspicious on Windows
@@ -105,7 +112,14 @@ impl ActiveStream {
             tokio::task::spawn(async move {
                 loop {
                     // get the underlying rtd_state to update it
-                    let has_new_data = sport.rtd_state().update_async().await;
+                    let has_new_data = select! {
+                        result = sport.rtd_state().update_async() => {
+                            result.map_err(Some)
+                        },
+                        () = tokio::time::sleep(Duration::from_millis(MAX_SERIAL_PACKET_DELAY)) => {
+                            Err(None)
+                        }
+                    };
 
                     match has_new_data {
                         Ok(true) => match sport.serialize_to_value() {
@@ -139,10 +153,14 @@ impl ActiveStream {
                         Ok(false) => {
                             // don't bother to update if nothing changed
                         }
-                        Err(err) => worker_event_tx
+                        Err(Some(err)) => worker_event_tx
                             .send(WorkerEvent::ErrorEvent(
                                 format!("failed to update RTD state: {err}").into(),
                             ))
+                            .await
+                            .expect("worker event tx closed!"),
+                        Err(None) => worker_event_tx
+                            .send(WorkerEvent::ErrorEvent("timeout when waiting for new score data from the serial connection".to_owned().into()))
                             .await
                             .expect("worker event tx closed!"),
                     }
@@ -285,7 +303,10 @@ impl ActiveStream {
         event: WorkerEvent,
     ) {
         match event {
-            WorkerEvent::ErrorEvent(err) => errors.push(err),
+            WorkerEvent::ErrorEvent(err) => {
+                eprintln!("WARN stream {}", err.msg);
+                errors.push(err)
+            }
             WorkerEvent::LatencySampleEvent(
                 sample,
                 new_latest_payload,
