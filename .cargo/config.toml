@@ -1,13 +1,2 @@
 [target.armv7-unknown-linux-gnueabihf]
-[profile.dev]
-# hacky since release fails on cross-compile
-opt-level = 3
-debug = false
-strip = "none"
-debug-assertions = false
-overflow-checks = false
-lto = false
-panic = 'unwind'
-incremental = false
-codegen-units = 16
-rpath = false
+linker = "arm-linux-gnueabihf-gcc"
