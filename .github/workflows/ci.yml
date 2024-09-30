@@ -1,4 +1,4 @@
-name: Rust
+name: CI
 
 on:
   push:
@@ -16,5 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - run: rustup toolchain install stable --profile minimal
+    - uses: Swatinem/rust-cache@v2.7.3
+      with:
+        save-if: ${{ github.ref == 'refs/heads/master' }}
     - name: Check
       run: cargo check --verbose
