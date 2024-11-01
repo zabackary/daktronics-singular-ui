@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use iced::{
-    widget::{column, component, container, pick_list, row, svg, text, Component},
-    Alignment, Border, Element, Length, Renderer, Shadow, Size, Theme,
+    widget::{column, container, pick_list, row, svg, text},
+    Alignment, Border, Length, Shadow, Theme,
 };
 use tokio_serial::SerialPortInfo;
 
@@ -58,84 +58,37 @@ fn enumerate_ports() -> Vec<SerialPortInfoWrapper> {
     ports
 }
 
-pub struct StreamStart<'a, Message: Clone> {
-    on_stream_start: Box<dyn Fn(String) -> Message>,
-    error: Option<&'a str>,
-    profile_is_dirty: bool,
-}
-
-impl<'a, Message: Clone> StreamStart<'a, Message> {
-    pub fn new(
-        on_stream_start: impl Fn(String) -> Message + 'static,
-        error: Option<&'a str>,
-        profile_is_dirty: bool,
-    ) -> StreamStart<'a, Message> {
-        StreamStart::<Message> {
-            on_stream_start: Box::new(on_stream_start),
-            error,
-            profile_is_dirty,
-        }
-    }
-}
-
-pub fn stream_start<'a, Message: Clone>(
-    on_stream_start: impl Fn(String) -> Message + 'static,
-    error: Option<&'a str>,
-    profile_is_dirty: bool,
-) -> StreamStart<'a, Message> {
-    StreamStart::<Message>::new(on_stream_start, error, profile_is_dirty)
+#[derive(Debug)]
+pub struct StreamStart {
+    serial_ports: Vec<SerialPortInfoWrapper>,
+    selected_serial_port: Option<SerialPortInfoWrapper>,
 }
 
 #[derive(Debug, Clone)]
-pub enum StreamStartEvent {
+pub enum StreamStartMessage {
     StartStream,
     SerialPortPicked(SerialPortInfoWrapper),
     RefreshSerialPorts,
 }
 
-#[derive(Debug, Clone)]
-pub struct StreamStartState {
-    serial_ports: Vec<SerialPortInfoWrapper>,
-    selected_serial_port: Option<SerialPortInfoWrapper>,
+pub enum Update {
+    None,
+    StartStream { port: String },
 }
 
-impl Default for StreamStartState {
-    fn default() -> Self {
-        StreamStartState {
-            serial_ports: enumerate_ports(),
+impl StreamStart {
+    pub fn new() -> Self {
+        Self {
             selected_serial_port: None,
-        }
-    }
-}
-
-impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
-    type State = StreamStartState;
-
-    type Event = StreamStartEvent;
-
-    fn update(&mut self, state: &mut Self::State, event: Self::Event) -> Option<Message> {
-        match event {
-            StreamStartEvent::StartStream => Some((self.on_stream_start)(
-                state
-                    .selected_serial_port
-                    .as_ref()
-                    .expect("tty port should be selected before StartStream callback is run")
-                    .0
-                    .port_name
-                    .clone(),
-            )),
-            StreamStartEvent::RefreshSerialPorts => {
-                state.serial_ports = enumerate_ports();
-                None
-            }
-            StreamStartEvent::SerialPortPicked(new_port) => {
-                state.selected_serial_port = Some(new_port);
-                None
-            }
+            serial_ports: enumerate_ports(),
         }
     }
 
-    fn view(&self, state: &Self::State) -> Element<Self::Event, Theme, Renderer> {
+    pub fn view<'a>(
+        &'a self,
+        error: Option<&'a str>,
+        profile_is_dirty: bool,
+    ) -> iced::Element<'a, StreamStartMessage> {
         iced::widget::stack([
             container(
                 svg(svg::Handle::from_memory(include_bytes!(
@@ -161,9 +114,9 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                         .into(),
                     row([
                         pick_list(
-                            state.serial_ports.clone(), // TODO: would be good to not clone this all the time but compiler errors...
-                            state.selected_serial_port.clone(), // TODO: this too
-                            StreamStartEvent::SerialPortPicked,
+                            self.serial_ports.clone(), // TODO: would be good to not clone this all the time but compiler errors...
+                            self.selected_serial_port.clone(), // TODO: this too
+                            StreamStartMessage::SerialPortPicked,
                         )
                         .placeholder("Serial port")
                         .padding(8)
@@ -173,17 +126,16 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                         icon_button(
                             include_bytes!("../../assets/icon_refresh.svg"),
                             "Refresh ports",
-                            Some(StreamStartEvent::RefreshSerialPorts),
+                            Some(StreamStartMessage::RefreshSerialPorts),
                             super::utils::RoundedButtonVariant::Secondary,
                         )
                         .into(),
                         icon_button(
                             include_bytes!("../../assets/icon_play_circle.svg"),
                             "Start stream",
-                            state
-                                .selected_serial_port
+                            self.selected_serial_port
                                 .is_some()
-                                .then_some(StreamStartEvent::StartStream),
+                                .then_some(StreamStartMessage::StartStream),
                             super::utils::RoundedButtonVariant::Secondary,
                         )
                         .into(),
@@ -191,7 +143,7 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                     .spacing(4)
                     .into(),
                 ])
-                .push_maybe(self.error.map(|error| {
+                .push_maybe(error.map(|error| {
                     container(
                         row([
                             container(
@@ -223,7 +175,7 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
                     })
                     .padding([8, 16])
                 }))
-                .push_maybe(self.profile_is_dirty.then(|| {
+                .push_maybe(profile_is_dirty.then(|| {
                     container(
                         row([
                             container(
@@ -269,19 +221,25 @@ impl<'a, Message: Clone> Component<Message> for StreamStart<'a, Message> {
         .into()
     }
 
-    fn size_hint(&self) -> Size<Length> {
-        Size {
-            width: Length::Fill,
-            height: Length::Fill,
+    pub fn update<'a>(&mut self, message: StreamStartMessage) -> Update {
+        match message {
+            StreamStartMessage::StartStream => Update::StartStream {
+                port: self
+                    .selected_serial_port
+                    .as_ref()
+                    .expect("tty port should be selected before StartStream callback is run")
+                    .0
+                    .port_name
+                    .clone(),
+            },
+            StreamStartMessage::RefreshSerialPorts => {
+                self.serial_ports = enumerate_ports();
+                Update::None
+            }
+            StreamStartMessage::SerialPortPicked(new_port) => {
+                self.selected_serial_port = Some(new_port);
+                Update::None
+            }
         }
-    }
-}
-
-impl<'a, Message: Clone> From<StreamStart<'a, Message>> for Element<'a, Message>
-where
-    Message: 'a,
-{
-    fn from(header: StreamStart<'a, Message>) -> Self {
-        component(header)
     }
 }

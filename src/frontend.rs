@@ -14,7 +14,6 @@ use iced::border::Radius;
 use iced::widget::{column, container, horizontal_space, row, scrollable, svg, text, text_input};
 use iced::{Alignment, Element, Length, Subscription, Task};
 use stream_running::stream_running;
-use stream_start::stream_start;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use utils::{icon_button, rounded_button, rounded_pane, rounded_text_input_style};
@@ -68,7 +67,6 @@ pub enum Message {
     WelcomeNewProfile,
     WelcomeImportProfile,
     WelcomeGitHub,
-    StartStream(String),
     EndStream,
     SwitchScreen(HeaderScreen),
     ProfileNameChange(String),
@@ -82,6 +80,8 @@ pub enum Message {
     SetUpCopyScript,
     SetUpOpenDataStreams,
     SetUpOpenDashboard,
+
+    StreamStartMessage(stream_start::StreamStartMessage),
 }
 
 #[derive(Debug, Default)]
@@ -89,7 +89,7 @@ pub enum Screen {
     Configure,
     SetUp(String),
     Stream(ActiveStream),
-    StreamStart(Option<String>),
+    StreamStart(stream_start::StreamStart, Option<String>),
     #[default]
     Welcome,
 }
@@ -260,28 +260,9 @@ impl DaktronicsSingularUiApp {
                 open::that_detached(GITHUB_URL).expect("failed to launch github in browser");
                 Task::none()
             }
-            Message::StartStream(tty_path) => match self.screen {
-                Screen::StreamStart(ref mut error) => {
-                    if self.profile.sport_type.is_some() {
-                        match ActiveStream::new(self.profile.to_owned(), tty_path) {
-                            Ok(stream) => {
-                                self.screen = Screen::Stream(stream);
-                            }
-                            Err(err) => *error = Some(err.to_string()),
-                        }
-                        Task::done(Message::UpdateStreamStats)
-                    } else {
-                        *error = Some(
-                            "You must set a sport type before beginning the stream.".to_owned(),
-                        );
-                        Task::none()
-                    }
-                }
-                _ => Task::none(),
-            },
             Message::EndStream => {
                 // Drop the stream, killing the background threads implicitly
-                self.screen = Screen::StreamStart(None);
+                self.screen = Screen::StreamStart(stream_start::StreamStart::new(), None);
                 Task::none()
             }
             Message::ProfileNameChange(new_name) => {
@@ -293,7 +274,9 @@ impl DaktronicsSingularUiApp {
                 self.screen = match new_screen {
                     HeaderScreen::Configure => Screen::Configure,
                     HeaderScreen::SetUp => Screen::SetUp(String::new()),
-                    HeaderScreen::Stream => Screen::StreamStart(None),
+                    HeaderScreen::Stream => {
+                        Screen::StreamStart(stream_start::StreamStart::new(), None)
+                    }
                 };
                 Task::none()
             }
@@ -440,6 +423,32 @@ impl DaktronicsSingularUiApp {
                 }
                 _ => Task::none(),
             },
+
+            Message::StreamStartMessage(message) => match self.screen {
+                Screen::StreamStart(ref mut screen_start, ref mut error) => {
+                    match screen_start.update(message) {
+                        stream_start::Update::None => Task::none(),
+                        stream_start::Update::StartStream { port } => {
+                            if self.profile.sport_type.is_some() {
+                                match ActiveStream::new(self.profile.to_owned(), port) {
+                                    Ok(stream) => {
+                                        self.screen = Screen::Stream(stream);
+                                    }
+                                    Err(err) => *error = Some(err.to_string()),
+                                }
+                                Task::done(Message::UpdateStreamStats)
+                            } else {
+                                *error = Some(
+                                    "You must set a sport type before beginning the stream."
+                                        .to_owned(),
+                                );
+                                Task::none()
+                            }
+                        }
+                    }
+                }
+                _ => Task::none(),
+            },
         }
     }
 
@@ -521,7 +530,7 @@ impl DaktronicsSingularUiApp {
                         match self.screen {
                             Screen::Configure => HeaderScreen::Configure,
                             Screen::SetUp(_) => HeaderScreen::SetUp,
-                            Screen::Stream(_) | Screen::StreamStart(_) => HeaderScreen::Stream,
+                            Screen::Stream(_) | Screen::StreamStart(_, _) => HeaderScreen::Stream,
                             Screen::Welcome => unreachable!(),
                         },
                         !matches!(self.screen, Screen::Stream(_)),
@@ -625,9 +634,8 @@ impl DaktronicsSingularUiApp {
                     Screen::Stream(active_stream) => {
                         stream_running(active_stream, Message::ClearStreamErrors).into()
                     }
-                    Screen::StreamStart(error) => {
-                        stream_start(Message::StartStream, error.as_deref(), self.profile_dirty)
-                            .into()
+                    Screen::StreamStart(stream_start, error) => {
+                        stream_start.view(error.as_deref(), self.profile_dirty).map(Message::StreamStartMessage)
                     }
                     Screen::Welcome => unreachable!(),
                 },
