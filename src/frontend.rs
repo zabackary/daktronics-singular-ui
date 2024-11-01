@@ -4,6 +4,7 @@ mod header;
 mod stream_running;
 mod stream_start;
 mod utils;
+mod welcome;
 
 use std::path::PathBuf;
 
@@ -463,70 +464,11 @@ impl DaktronicsSingularUiApp {
 
     pub fn view(&self) -> Element<Message> {
         if matches!(self.screen, Screen::Welcome) {
-            iced::widget::stack([
-                container(
-                    svg(svg::Handle::from_memory(include_bytes!(
-                        "../assets/splash.svg"
-                    )))
-                    .width(700)
-                    .height(350)
-                    .content_fit(iced::ContentFit::Cover)
-                    .opacity(0.8),
-                )
-                .align_x(iced::alignment::Horizontal::Left)
-                .align_y(iced::alignment::Vertical::Bottom)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into(),
-                container(
-                    column([
-                        text(concat!(
-                            "Daktronics Singular UI v",
-                            env!("CARGO_PKG_VERSION")
-                        ))
-                        .size(18)
-                        .style(|theme: &iced::Theme| text::Style {
-                            color: Some(theme.palette().text.scale_alpha(0.6)),
-                        })
-                        .into(),
-                        text("Welcome.")
-                            .style(|theme: &iced::Theme| text::Style {
-                                color: Some(theme.palette().text),
-                            })
-                            .size(76)
-                            .into(),
-                        row([
-                            rounded_button(
-                                text("Import profile").size(18),
-                                utils::RoundedButtonVariant::Primary,
-                            )
-                            .on_press(Message::WelcomeImportProfile)
-                            .into(),
-                            rounded_button(
-                                text("New profile").size(18),
-                                utils::RoundedButtonVariant::Primary,
-                            )
-                            .on_press(Message::WelcomeNewProfile)
-                            .into(),
-                            rounded_button(
-                                text("Open GitHub source").size(18),
-                                utils::RoundedButtonVariant::Secondary,
-                            )
-                            .on_press(Message::WelcomeGitHub)
-                            .into(),
-                        ])
-                        .spacing(8)
-                        .into(),
-                    ])
-                    .spacing(16)
-                    .align_x(Alignment::Start),
-                )
-                .align_y(iced::alignment::Vertical::Center)
-                .align_x(iced::alignment::Horizontal::Center)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into(),
-            ])
+            welcome::view(
+                Message::WelcomeImportProfile,
+                Message::WelcomeNewProfile,
+                Message::WelcomeGitHub,
+            )
             .into()
         } else {
             column([
