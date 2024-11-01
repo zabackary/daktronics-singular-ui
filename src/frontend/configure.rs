@@ -14,7 +14,7 @@ use crate::backend::{
 };
 
 use super::utils::{
-    icon_button, rounded_button, rounded_pick_list_style, rounded_text_input_style, BORDER_RADIUS,
+    icon_button, rounded_button, rounded_pick_list_style, rounded_text_input_style,
 };
 
 #[derive(Clone, Debug)]

@@ -18,7 +18,7 @@ use tokio::{
 };
 use tokio_serial::SerialPortBuilderExt;
 
-use crate::{backend::serializer::serialize_mappings, mock::MockDataSource, APP_USER_AGENT};
+use crate::{backend::serializer::serialize_mappings, APP_USER_AGENT};
 
 use super::{network::put_to_server, profile::Profile};
 
