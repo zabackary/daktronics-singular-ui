@@ -17,7 +17,7 @@ pub struct ProfileV2 {
     pub mappings: Vec<ProfileV2CompositionMapping>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProfileV2CompositionMapping {
     pub subcomp_name: String,
     pub mapping: Mapping,
