@@ -53,7 +53,7 @@ struct Args {
     ///
     /// Passing a number indicates the maximum tolerated error count. Default 3.
     /// Max 15.
-    #[arg(short, long, default_missing_value = "3", require_equals = true, num_args = 0..1)]
+    #[arg(short, long, default_missing_value = "3")]
     unattended: Option<usize>,
 }
 
