@@ -1,3 +1,5 @@
+pub mod latency_graph;
+
 use std::{
     error::Error,
     sync::Arc,
@@ -16,32 +18,11 @@ use tokio::{
 };
 use tokio_serial::SerialPortBuilderExt;
 
-use crate::APP_USER_AGENT;
+use crate::{mock::MockDataSource, APP_USER_AGENT};
 
 use super::{network::put_to_server, profile::Profile};
 
 const MAX_SERIAL_PACKET_DELAY: u64 = 3000;
-
-mod latency_graph {
-    use std::time::{Duration, Instant};
-
-    #[derive(Debug, Clone)]
-    pub struct LatencySample {
-        pub timestamp: Instant,
-        pub latency: Duration,
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct SerialEvent {
-        pub timestamp: Instant,
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct LatencyGraphData {
-        pub samples: Vec<LatencySample>,
-        pub serial_events: Vec<SerialEvent>,
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct ErrorInfo {
