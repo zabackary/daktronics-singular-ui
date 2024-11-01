@@ -1,6 +1,6 @@
 use iced::{
-    widget::{column, component, container, horizontal_space, row, scrollable, text, Component},
-    Element, Font, Length, Padding, Renderer, Size, Theme,
+    widget::{column, container, horizontal_space, row, scrollable, text},
+    Element, Font, Length, Padding, Renderer, Theme,
 };
 
 use crate::backend::stream::ActiveStream;
@@ -10,33 +10,14 @@ use super::{
     utils::{icon_button, rounded_pane},
 };
 
-pub struct StreamRunning<'a, Message> {
-    active_stream: &'a ActiveStream,
-    clear_errors: Message,
-}
-
-impl<'a, Message> StreamRunning<'a, Message> {
-    pub fn new(
-        active_stream: &'a ActiveStream,
-        clear_errors: Message,
-    ) -> StreamRunning<'a, Message> {
-        StreamRunning {
-            active_stream,
-            clear_errors,
-        }
-    }
+#[derive(Debug, Clone, Copy)]
+pub struct StreamRunning {
+    _no_public_constructor: (),
 }
 
 #[derive(Clone, Debug, Copy)]
-pub enum StreamRunningEvent {
+pub enum StreamRunningMessage {
     ClearErrors,
-}
-
-pub fn stream_running<'a, Message>(
-    active_stream: &'a ActiveStream,
-    clear_errors: Message,
-) -> StreamRunning<'a, Message> {
-    StreamRunning::new(&active_stream, clear_errors)
 }
 
 fn pane_header<'a, Message: 'a>(
@@ -73,22 +54,33 @@ fn pane_header<'a, Message: 'a>(
     .into()
 }
 
-impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
-    type State = ();
+pub enum Update {
+    #[allow(dead_code)]
+    None,
+    ClearErrors,
+}
 
-    type Event = StreamRunningEvent;
-
-    fn update(&mut self, _state: &mut Self::State, event: Self::Event) -> Option<Message> {
-        match event {
-            StreamRunningEvent::ClearErrors => Some(self.clear_errors.clone()),
+impl StreamRunning {
+    pub fn new() -> Self {
+        Self {
+            _no_public_constructor: (),
         }
     }
 
-    fn view(&self, _state: &Self::State) -> Element<Self::Event, Theme, Renderer> {
+    pub fn update(&mut self, message: StreamRunningMessage) -> Update {
+        match message {
+            StreamRunningMessage::ClearErrors => Update::ClearErrors,
+        }
+    }
+
+    pub fn view<'a>(
+        &'a self,
+        active_stream: &'a ActiveStream,
+    ) -> Element<'a, StreamRunningMessage, Theme, Renderer> {
         let latency_pane = column([
             pane_header(
                 "Latency",
-                self.active_stream
+                active_stream
                     .latency_graph_data()
                     .samples
                     .last()
@@ -99,7 +91,7 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                 Option::<&str>::None,
             ),
             rounded_pane(
-                container(graph(&self.active_stream))
+                container(graph(&active_stream))
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .padding(16),
@@ -112,7 +104,7 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
             column([
                 pane_header(
                     "Latest payload",
-                    self.active_stream
+                    active_stream
                         .latest_payload_size()
                         .unwrap_or(0)
                         .try_into()
@@ -124,7 +116,7 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                 ),
                 rounded_pane(scrollable(
                     container(
-                        text(self.active_stream.latest_payload().unwrap_or("No data"))
+                        text(active_stream.latest_payload().unwrap_or("No data"))
                             .font(Font::MONOSPACE),
                     )
                     .width(Length::Fill)
@@ -135,25 +127,21 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
                 .into(),
             ])
         };
-        let error_pane = (!self.active_stream.errors().is_empty()).then(|| {
+        let error_pane = (!active_stream.errors().is_empty()).then(|| {
             column([
                 pane_header(
                     "Errors (last 20)",
-                    self.active_stream
-                        .errors()
-                        .len()
-                        .try_into()
-                        .unwrap_or(i32::MAX),
+                    active_stream.errors().len().try_into().unwrap_or(i32::MAX),
                     "x",
                     Some(icon_button(
                         include_bytes!("../../assets/icon_delete.svg"),
                         "Clear messages",
-                        Some(StreamRunningEvent::ClearErrors),
+                        Some(StreamRunningMessage::ClearErrors),
                         super::utils::RoundedButtonVariant::Secondary,
                     )),
                 ),
                 scrollable(
-                    column(self.active_stream.errors().iter().map(|error| {
+                    column(active_stream.errors().iter().map(|error| {
                         rounded_pane(
                             column([
                                 text(timeago::Formatter::new().convert(error.timestamp.elapsed()))
@@ -179,21 +167,5 @@ impl<'a, Message: Clone> Component<Message> for StreamRunning<'a, Message> {
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
-    }
-
-    fn size_hint(&self) -> Size<Length> {
-        Size {
-            width: Length::Fill,
-            height: Length::Fill,
-        }
-    }
-}
-
-impl<'a, Message: Clone> From<StreamRunning<'a, Message>> for Element<'a, Message>
-where
-    Message: 'a,
-{
-    fn from(header: StreamRunning<'a, Message>) -> Self {
-        component(header)
     }
 }
