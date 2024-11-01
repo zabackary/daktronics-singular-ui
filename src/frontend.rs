@@ -4,16 +4,14 @@ mod header;
 mod stream_running;
 mod stream_start;
 mod utils;
+mod welcome;
 
 use std::path::PathBuf;
 
 use configure::{configure, ConfigureEvent};
-use header::{header, HeaderScreen};
 use iced::border::Radius;
 use iced::widget::{column, container, horizontal_space, row, scrollable, svg, text, text_input};
 use iced::{Alignment, Element, Length, Subscription, Task};
-use stream_running::stream_running;
-use stream_start::stream_start;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use utils::{icon_button, rounded_button, rounded_pane, rounded_text_input_style};
@@ -32,6 +30,7 @@ pub struct DaktronicsSingularUiApp {
     pub hide_header: bool,
     pub unattended: Option<usize>,
     pub initial_tty_path: Option<String>,
+    pub header: header::Header,
 }
 
 fn use_dark_mode() -> bool {
@@ -49,6 +48,7 @@ impl Default for DaktronicsSingularUiApp {
             hide_header: false,
             unattended: None,
             initial_tty_path: None,
+            header: header::Header::new(),
         }
     }
 }
@@ -67,13 +67,11 @@ pub enum Message {
     WelcomeNewProfile,
     WelcomeImportProfile,
     WelcomeGitHub,
-    StartStream(String),
     EndStream,
-    SwitchScreen(HeaderScreen),
+    SwitchScreen(header::HeaderScreen),
     ProfileNameChange(String),
     UpdateStreamStats,
     UpdateStreamStatsResponse(Vec<WorkerEvent>),
-    ClearStreamErrors,
     HandleConfigureEvent(ConfigureEvent),
     CloseRequested,
     Close,
@@ -81,16 +79,26 @@ pub enum Message {
     SetUpCopyScript,
     SetUpOpenDataStreams,
     SetUpOpenDashboard,
+
+    StreamRunningMessage(stream_running::StreamRunningMessage),
+    StreamStartMessage(stream_start::StreamStartMessage),
+    HeaderMessage(header::HeaderMessage),
 }
 
 #[derive(Debug, Default)]
 pub enum Screen {
     Configure,
     SetUp(String),
-    Stream(ActiveStream),
-    StreamStart(Option<String>),
+    StreamRunning(stream_running::StreamRunning, ActiveStream),
+    StreamStart(stream_start::StreamStart, Option<String>),
     #[default]
     Welcome,
+}
+
+impl Screen {
+    pub fn stream_running(stream: ActiveStream) -> Self {
+        Self::StreamRunning(stream_running::StreamRunning::new(), stream)
+    }
 }
 
 impl DaktronicsSingularUiApp {
@@ -100,7 +108,7 @@ impl DaktronicsSingularUiApp {
             Message::NoOp => Task::none(),
             Message::ExportProfile => {
                 let profile_name = self.profile.name.clone();
-                let result = serde_json::to_string(&self.profile);
+                let result = self.profile.export();
                 Task::future(async move {
                     async fn export_profile(
                         profile_name: &str,
@@ -197,7 +205,7 @@ impl DaktronicsSingularUiApp {
                     file.read_to_string(&mut buffer)
                         .await
                         .map_err(|err| err.to_string())?;
-                    serde_json::from_str(&buffer).map_err(|err| err.to_string())
+                    Profile::import(&buffer).map_err(|err| err.to_string())
                 }
                 match import_from_path(path).await {
                     Ok(profile) => Message::ImportProfileFinished(profile),
@@ -259,28 +267,9 @@ impl DaktronicsSingularUiApp {
                 open::that_detached(GITHUB_URL).expect("failed to launch github in browser");
                 Task::none()
             }
-            Message::StartStream(tty_path) => match self.screen {
-                Screen::StreamStart(ref mut error) => {
-                    if self.profile.sport_type.is_some() {
-                        match ActiveStream::new(self.profile.to_owned(), tty_path) {
-                            Ok(stream) => {
-                                self.screen = Screen::Stream(stream);
-                            }
-                            Err(err) => *error = Some(err.to_string()),
-                        }
-                        Task::done(Message::UpdateStreamStats)
-                    } else {
-                        *error = Some(
-                            "You must set a sport type before beginning the stream.".to_owned(),
-                        );
-                        Task::none()
-                    }
-                }
-                _ => Task::none(),
-            },
             Message::EndStream => {
                 // Drop the stream, killing the background threads implicitly
-                self.screen = Screen::StreamStart(None);
+                self.screen = Screen::StreamStart(stream_start::StreamStart::new(), None);
                 Task::none()
             }
             Message::ProfileNameChange(new_name) => {
@@ -290,14 +279,16 @@ impl DaktronicsSingularUiApp {
             }
             Message::SwitchScreen(new_screen) => {
                 self.screen = match new_screen {
-                    HeaderScreen::Configure => Screen::Configure,
-                    HeaderScreen::SetUp => Screen::SetUp(String::new()),
-                    HeaderScreen::Stream => Screen::StreamStart(None),
+                    header::HeaderScreen::Configure => Screen::Configure,
+                    header::HeaderScreen::SetUp => Screen::SetUp(String::new()),
+                    header::HeaderScreen::Stream => {
+                        Screen::StreamStart(stream_start::StreamStart::new(), None)
+                    }
                 };
                 Task::none()
             }
             Message::UpdateStreamStats => match self.screen {
-                Screen::Stream(ref mut active_stream) => {
+                Screen::StreamRunning(ref _stream_running, ref mut active_stream) => {
                     let rx = active_stream.worker_event_rx.clone();
                     Task::perform(
                         async move {
@@ -311,7 +302,7 @@ impl DaktronicsSingularUiApp {
                 _ => Task::none(),
             },
             Message::UpdateStreamStatsResponse(events) => match self.screen {
-                Screen::Stream(ref mut active_stream) => {
+                Screen::StreamRunning(ref _stream_running, ref mut active_stream) => {
                     active_stream.update_from_events(events);
                     if self.unattended.is_some()
                         && self.initial_tty_path.is_some()
@@ -327,7 +318,10 @@ impl DaktronicsSingularUiApp {
                             self.initial_tty_path.as_ref().expect("no tty path").clone(),
                         ) {
                             Ok(stream) => {
-                                self.screen = Screen::Stream(stream);
+                                self.screen = Screen::StreamRunning(
+                                    stream_running::StreamRunning::new(),
+                                    stream,
+                                );
                                 eprintln!("INFO frontend Restarted stream successfully");
                             }
                             Err(err) => {
@@ -336,13 +330,6 @@ impl DaktronicsSingularUiApp {
                         }
                     }
                     Task::done(Message::UpdateStreamStats)
-                }
-                _ => Task::none(),
-            },
-            Message::ClearStreamErrors => match self.screen {
-                Screen::Stream(ref mut active_stream) => {
-                    active_stream.clear_errors();
-                    Task::none()
                 }
                 _ => Task::none(),
             },
@@ -386,7 +373,7 @@ impl DaktronicsSingularUiApp {
             }
             Message::CloseRequested => {
                 let profile_dirty = self.profile_dirty;
-                let is_streaming = matches!(self.screen, Screen::Stream(_));
+                let is_streaming = matches!(self.screen, Screen::StreamRunning(_, _));
                 if profile_dirty || is_streaming {
                     Task::future(async move {
                         match rfd::AsyncMessageDialog::new()
@@ -439,6 +426,59 @@ impl DaktronicsSingularUiApp {
                 }
                 _ => Task::none(),
             },
+
+            Message::HeaderMessage(message) => match self.header.update(message) {
+                // TODO: many of these messages can just be moved here.
+                header::Update::None => Task::none(),
+                header::Update::NewProfile => Task::done(Message::TryNewProfile),
+                header::Update::ChangeProfileName(new) => {
+                    Task::done(Message::ProfileNameChange(new))
+                }
+                header::Update::EndStream => Task::done(Message::EndStream),
+                header::Update::ExportProfile => Task::done(Message::ExportProfile),
+                header::Update::ImportProfile => Task::done(Message::TryImportProfile),
+                header::Update::Switch(new_screen) => Task::done(Message::SwitchScreen(new_screen)),
+            },
+            Message::StreamRunningMessage(message) => match self.screen {
+                Screen::StreamRunning(ref mut stream_running, ref mut stream) => {
+                    match stream_running.update(message) {
+                        stream_running::Update::None => Task::none(),
+                        stream_running::Update::ClearErrors => {
+                            stream.clear_errors();
+                            Task::none()
+                        }
+                    }
+                }
+                _ => Task::none(),
+            },
+            Message::StreamStartMessage(message) => match self.screen {
+                Screen::StreamStart(ref mut screen_start, ref mut error) => {
+                    match screen_start.update(message) {
+                        stream_start::Update::None => Task::none(),
+                        stream_start::Update::StartStream { port } => {
+                            if self.profile.sport_type.is_some() {
+                                match ActiveStream::new(self.profile.to_owned(), port) {
+                                    Ok(stream) => {
+                                        self.screen = Screen::StreamRunning(
+                                            stream_running::StreamRunning::new(),
+                                            stream,
+                                        );
+                                    }
+                                    Err(err) => *error = Some(err.to_string()),
+                                }
+                                Task::done(Message::UpdateStreamStats)
+                            } else {
+                                *error = Some(
+                                    "You must set a sport type before beginning the stream."
+                                        .to_owned(),
+                                );
+                                Task::none()
+                            }
+                        }
+                    }
+                }
+                _ => Task::none(),
+            },
         }
     }
 
@@ -463,71 +503,11 @@ impl DaktronicsSingularUiApp {
 
     pub fn view(&self) -> Element<Message> {
         if matches!(self.screen, Screen::Welcome) {
-            iced::widget::stack([
-                container(
-                    svg(svg::Handle::from_memory(include_bytes!(
-                        "../assets/splash.svg"
-                    )))
-                    .width(700)
-                    .height(350)
-                    .content_fit(iced::ContentFit::Cover)
-                    .opacity(0.8),
-                )
-                .align_x(iced::alignment::Horizontal::Left)
-                .align_y(iced::alignment::Vertical::Bottom)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into(),
-                container(
-                    column([
-                        text(concat!(
-                            "Daktronics Singular UI v",
-                            env!("CARGO_PKG_VERSION")
-                        ))
-                        .size(18)
-                        .style(|theme: &iced::Theme| text::Style {
-                            color: Some(theme.palette().text.scale_alpha(0.6)),
-                        })
-                        .into(),
-                        text("Welcome.")
-                            .style(|theme: &iced::Theme| text::Style {
-                                color: Some(theme.palette().text),
-                            })
-                            .size(76)
-                            .into(),
-                        row([
-                            rounded_button(
-                                text("Import profile").size(18),
-                                utils::RoundedButtonVariant::Primary,
-                            )
-                            .on_press(Message::WelcomeImportProfile)
-                            .into(),
-                            rounded_button(
-                                text("New profile").size(18),
-                                utils::RoundedButtonVariant::Primary,
-                            )
-                            .on_press(Message::WelcomeNewProfile)
-                            .into(),
-                            rounded_button(
-                                text("Open GitHub source").size(18),
-                                utils::RoundedButtonVariant::Secondary,
-                            )
-                            .on_press(Message::WelcomeGitHub)
-                            .into(),
-                        ])
-                        .spacing(8)
-                        .into(),
-                    ])
-                    .spacing(16)
-                    .align_x(Alignment::Start),
-                )
-                .align_y(iced::alignment::Vertical::Center)
-                .align_x(iced::alignment::Horizontal::Center)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into(),
-            ])
-            .into()
+            welcome::view(
+                Message::WelcomeImportProfile,
+                Message::WelcomeNewProfile,
+                Message::WelcomeGitHub,
+            )
         } else {
             column([
                 if self.hide_header {
@@ -543,7 +523,7 @@ impl DaktronicsSingularUiApp {
                             .height(18)
                             .into(),
                             horizontal_space().width(4.0).into(),
-                            text("Daktronics Singular UI - Streaming \"").size(12.0).into(),
+                            text("Daktronics Singular UI - Profile: \"").size(12.0).into(),
                             text(&self.profile.name).size(12.0).into(),
                             text("\" live").size(12.0).into(),
                         ])
@@ -553,7 +533,7 @@ impl DaktronicsSingularUiApp {
                     .style(|theme: &iced::Theme| {
                         let palette = theme.extended_palette();
                         let error_state = match &self.screen {
-                            Screen::Stream(stream) => stream.errors().len() > 0,
+                            Screen::StreamRunning(_, stream) => stream.errors().len() > 0,
                             _ => false
                         };
                         let base_style = container::Style {
@@ -576,23 +556,18 @@ impl DaktronicsSingularUiApp {
                     })
                     .into()
                 } else {
-                    header(
+                    self.header.view(
+                        !matches!(self.screen, Screen::StreamRunning(_, _)),
                         match self.screen {
-                            Screen::Configure => HeaderScreen::Configure,
-                            Screen::SetUp(_) => HeaderScreen::SetUp,
-                            Screen::Stream(_) | Screen::StreamStart(_) => HeaderScreen::Stream,
+                            Screen::Configure => header::HeaderScreen::Configure,
+                            Screen::SetUp(_) => header::HeaderScreen::SetUp,
+                            Screen::StreamRunning(_, _) | Screen::StreamStart(_, _) => header::HeaderScreen::Stream,
                             Screen::Welcome => unreachable!(),
                         },
-                        !matches!(self.screen, Screen::Stream(_)),
-                        Message::SwitchScreen,
+                        matches!(self.screen, Screen::StreamRunning(_, _)),
                         &self.profile.name,
-                        Message::ProfileNameChange,
-                        Message::TryImportProfile,
-                        Message::ExportProfile,
-                        Message::TryNewProfile,
-                        matches!(self.screen, Screen::Stream(_)).then_some(Message::EndStream),
                     )
-                    .into()
+                    .map(Message::HeaderMessage)
                 },
                 match &self.screen {
                     Screen::Configure => configure(
@@ -681,12 +656,11 @@ impl DaktronicsSingularUiApp {
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .into(),
-                    Screen::Stream(active_stream) => {
-                        stream_running(active_stream, Message::ClearStreamErrors).into()
+                    Screen::StreamRunning(stream_running, active_stream) => {
+                        stream_running.view(active_stream).map(Message::StreamRunningMessage)
                     }
-                    Screen::StreamStart(error) => {
-                        stream_start(Message::StartStream, error.as_deref(), self.profile_dirty)
-                            .into()
+                    Screen::StreamStart(stream_start, error) => {
+                        stream_start.view(error.as_deref(), self.profile_dirty).map(Message::StreamStartMessage)
                     }
                     Screen::Welcome => unreachable!(),
                 },

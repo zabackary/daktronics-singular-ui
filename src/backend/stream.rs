@@ -1,3 +1,5 @@
+pub mod latency_graph;
+
 use std::{
     error::Error,
     sync::Arc,
@@ -16,32 +18,11 @@ use tokio::{
 };
 use tokio_serial::SerialPortBuilderExt;
 
-use crate::APP_USER_AGENT;
+use crate::{mock::MockDataSource, APP_USER_AGENT};
 
 use super::{network::put_to_server, profile::Profile};
 
 const MAX_SERIAL_PACKET_DELAY: u64 = 3000;
-
-mod latency_graph {
-    use std::time::{Duration, Instant};
-
-    #[derive(Debug, Clone)]
-    pub struct LatencySample {
-        pub timestamp: Instant,
-        pub latency: Duration,
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct SerialEvent {
-        pub timestamp: Instant,
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct LatencyGraphData {
-        pub samples: Vec<LatencySample>,
-        pub serial_events: Vec<SerialEvent>,
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct ErrorInfo {
@@ -86,6 +67,7 @@ impl ActiveStream {
         );
         let (worker_event_tx, worker_event_rx) = mpsc::channel(255);
 
+        /*/
         // allow because cargo gets suspicious on Windows
         #[allow(unused_mut)]
         let mut port = tokio_serial::new(tty_path, 19200)
@@ -97,6 +79,8 @@ impl ActiveStream {
             .expect("unable to set serial port exclusive to false");
 
         let rtd_state = RTDState::from_serial_stream(port, true)?;
+        */
+        let rtd_state = RTDState::new(MockDataSource::new());
 
         let serialized = Arc::new(Mutex::new(None));
         let mut sport = profile

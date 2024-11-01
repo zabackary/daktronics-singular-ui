@@ -203,7 +203,7 @@ fn main() -> Result<(), DSUError> {
                 profile.clone(),
                 args.serial_path.as_ref().expect("no tty path").clone(),
             ) {
-                Ok(stream) => frontend::Screen::Stream(stream),
+                Ok(stream) => frontend::Screen::stream_running(stream),
                 Err(err) => {
                     eprintln!("ERR main Couldn't start stream: {}", err);
                     immediately_exit = true;
