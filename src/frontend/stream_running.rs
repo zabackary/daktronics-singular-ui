@@ -6,7 +6,7 @@ use iced::{
 use crate::backend::stream::ActiveStream;
 
 use super::{
-    graph::graph,
+    graph::Graph,
     utils::{icon_button, rounded_pane},
 };
 
@@ -91,7 +91,7 @@ impl StreamRunning {
                 Option::<&str>::None,
             ),
             rounded_pane(
-                container(graph(&active_stream))
+                container(Graph::new(&active_stream).into_view())
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .padding(16),

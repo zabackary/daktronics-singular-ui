@@ -2,27 +2,23 @@ use std::{cmp::max, time::Duration};
 
 use iced::{
     mouse,
-    widget::{
-        canvas::{self, Cache, Canvas, Path, Text},
-        component, Component,
-    },
+    widget::canvas::{self, Cache, Canvas, Path, Text},
     Element, Font, Length, Point, Renderer, Size, Theme,
 };
 
-use crate::backend::stream::ActiveStream;
+use crate::backend::stream::{latency_graph::LatencyGraphData, ActiveStream};
 
-pub struct Graph<'a> {
-    active_stream: &'a ActiveStream,
+pub struct Graph {
+    data: LatencyGraphData,
 }
 
-impl<'a> Graph<'a> {
-    pub fn new(active_stream: &'a ActiveStream) -> Graph<'a> {
-        Graph { active_stream }
+impl Graph {
+    pub fn new(active_stream: &ActiveStream) -> Graph {
+        Graph {
+            data: active_stream.latency_graph_data().clone(), // TODO: can we remove this `clone`?
+        }
     }
 }
-
-#[derive(Clone, Debug, Copy)]
-pub enum GraphEvent {}
 
 #[derive(Debug, Default)]
 pub struct GraphProgramState {
@@ -30,35 +26,16 @@ pub struct GraphProgramState {
     graph: Cache,
 }
 
-pub fn graph<'a>(active_stream: &'a ActiveStream) -> Graph<'a> {
-    Graph::new(&active_stream)
-}
-
-impl<'a, Message: Clone> Component<Message> for Graph<'a> {
-    type State = ();
-
-    type Event = GraphEvent;
-
-    fn update(&mut self, _state: &mut Self::State, _event: Self::Event) -> Option<Message> {
-        None
-    }
-
-    fn view(&self, _state: &Self::State) -> Element<Self::Event, Theme, Renderer> {
-        Canvas::new(self as &Self)
+impl Graph {
+    pub fn into_view<'a, Message: 'a>(self) -> Element<'a, Message, Theme, Renderer> {
+        Canvas::new(self)
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
     }
-
-    fn size_hint(&self) -> Size<Length> {
-        Size {
-            width: Length::Fill,
-            height: Length::Fill,
-        }
-    }
 }
 
-impl<Message> canvas::Program<Message> for Graph<'_> {
+impl<Message> canvas::Program<Message> for Graph {
     type State = GraphProgramState;
 
     fn draw(
@@ -169,7 +146,7 @@ impl<Message> canvas::Program<Message> for Graph<'_> {
         let graph = state.graph.draw(renderer, bounds.size(), |frame| {
             let palette = theme.extended_palette();
 
-            let data = self.active_stream.latency_graph_data();
+            let data = &self.data;
             let max_latency = data
                 .samples
                 .iter()
@@ -261,14 +238,5 @@ impl<Message> canvas::Program<Message> for Graph<'_> {
         });
 
         vec![grid_labels, graph]
-    }
-}
-
-impl<'a, Message: Clone> From<Graph<'a>> for Element<'a, Message>
-where
-    Message: 'a,
-{
-    fn from(header: Graph<'a>) -> Self {
-        component(header)
     }
 }
