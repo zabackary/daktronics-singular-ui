@@ -8,7 +8,7 @@ pub fn view<'a, Message: Clone + 'a>(
     import_profile_message: Message,
     new_profile_message: Message,
     open_github_message: Message,
-) -> iced::widget::Stack<'a, Message> {
+) -> iced::Element<'a, Message> {
     iced::widget::stack([
         container(
             svg(svg::Handle::from_memory(include_bytes!(
@@ -73,4 +73,5 @@ pub fn view<'a, Message: Clone + 'a>(
         .height(Length::Fill)
         .into(),
     ])
+    .into()
 }

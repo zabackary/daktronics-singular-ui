@@ -469,7 +469,6 @@ impl DaktronicsSingularUiApp {
                 Message::WelcomeNewProfile,
                 Message::WelcomeGitHub,
             )
-            .into()
         } else {
             column([
                 if self.hide_header {
