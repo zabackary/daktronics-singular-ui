@@ -67,7 +67,6 @@ impl ActiveStream {
         );
         let (worker_event_tx, worker_event_rx) = mpsc::channel(255);
 
-        /*/
         // allow because cargo gets suspicious on Windows
         #[allow(unused_mut)]
         let mut port = tokio_serial::new(tty_path, 19200)
@@ -79,8 +78,6 @@ impl ActiveStream {
             .expect("unable to set serial port exclusive to false");
 
         let rtd_state = RTDState::from_serial_stream(port, true)?;
-        */
-        let rtd_state = RTDState::new(MockDataSource::new());
 
         let serialized = Arc::new(Mutex::new(None));
         let mut sport = profile

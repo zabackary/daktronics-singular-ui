@@ -108,7 +108,7 @@ impl DaktronicsSingularUiApp {
             Message::NoOp => Task::none(),
             Message::ExportProfile => {
                 let profile_name = self.profile.name.clone();
-                let result = self.profile.export();
+                let result = serde_json::to_string(&self.profile);
                 Task::future(async move {
                     async fn export_profile(
                         profile_name: &str,
@@ -205,7 +205,7 @@ impl DaktronicsSingularUiApp {
                     file.read_to_string(&mut buffer)
                         .await
                         .map_err(|err| err.to_string())?;
-                    Profile::import(&buffer).map_err(|err| err.to_string())
+                    serde_json::from_str(&buffer).map_err(|err| err.to_string())
                 }
                 match import_from_path(path).await {
                     Ok(profile) => Message::ImportProfileFinished(profile),
