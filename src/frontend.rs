@@ -8,7 +8,7 @@ mod welcome;
 
 use std::path::PathBuf;
 
-use configure::{configure, ConfigureEvent};
+use configure::{ConfigureMessage, ProfileConfigureExt};
 use iced::border::Radius;
 use iced::widget::{column, container, horizontal_space, row, scrollable, svg, text, text_input};
 use iced::{Alignment, Element, Length, Subscription, Task};
@@ -72,7 +72,6 @@ pub enum Message {
     ProfileNameChange(String),
     UpdateStreamStats,
     UpdateStreamStatsResponse(Vec<WorkerEvent>),
-    HandleConfigureEvent(ConfigureEvent),
     CloseRequested,
     Close,
     SetUpTokenUpdated(String),
@@ -80,6 +79,7 @@ pub enum Message {
     SetUpOpenDataStreams,
     SetUpOpenDashboard,
 
+    ProfileConfigureMessage(ConfigureMessage),
     StreamRunningMessage(stream_running::StreamRunningMessage),
     StreamStartMessage(stream_start::StreamStartMessage),
     HeaderMessage(header::HeaderMessage),
@@ -333,44 +333,6 @@ impl DaktronicsSingularUiApp {
                 }
                 _ => Task::none(),
             },
-            Message::HandleConfigureEvent(event) => {
-                self.profile_dirty = true;
-                match event {
-                    ConfigureEvent::DataStreamUrlUpdated(new) => self.profile.data_stream_url = new,
-                    ConfigureEvent::SubcompNameUpdated(new) => self.profile.subcomp_name = new,
-                    ConfigureEvent::SportTypeUpdated(new) => {
-                        self.sport_type_keys = new
-                            .all_serialized_keys()
-                            .expect("failed to get key list for sport");
-                        self.profile.sport_type = Some(new)
-                    }
-                    ConfigureEvent::MultipleRequestsUpdated(new) => {
-                        self.profile.multiple_requests = new
-                    }
-                    ConfigureEvent::ExcludeIncompleteDataUpdated(new) => {
-                        self.profile.exclude_incomplete_data = new
-                    }
-                    ConfigureEvent::MappingItemAdded => {
-                        self.profile.mapping.items.push(Default::default())
-                    }
-                    ConfigureEvent::MappingItemRemoved(i) => {
-                        self.profile.mapping.items.remove(i);
-                    }
-                    ConfigureEvent::MappingItemEnabledUpdated(i, new) => {
-                        self.profile.mapping.items[i].enabled = new
-                    }
-                    ConfigureEvent::MappingItemSourceFieldUpdated(i, new) => {
-                        self.profile.mapping.items[i].source_field = new
-                    }
-                    ConfigureEvent::MappingItemTransformationUpdated(i, new) => {
-                        self.profile.mapping.items[i].transformation = new
-                    }
-                    ConfigureEvent::MappingItemDestinationFieldUpdated(i, new) => {
-                        self.profile.mapping.items[i].destination_field = new
-                    }
-                };
-                Task::none()
-            }
             Message::CloseRequested => {
                 let profile_dirty = self.profile_dirty;
                 let is_streaming = matches!(self.screen, Screen::StreamRunning(_, _));
@@ -427,6 +389,16 @@ impl DaktronicsSingularUiApp {
                 _ => Task::none(),
             },
 
+            Message::ProfileConfigureMessage(message) => match self.profile.update(message) {
+                configure::Update::None => Task::none(),
+                configure::Update::RefreshSports(sport) => {
+                    self.sport_type_keys = sport
+                        .all_serialized_keys()
+                        .expect("failed to get key list for sport");
+                    self.profile.sport_type = Some(sport);
+                    Task::none()
+                }
+            },
             Message::HeaderMessage(message) => match self.header.update(message) {
                 // TODO: many of these messages can just be moved here.
                 header::Update::None => Task::none(),
@@ -570,11 +542,7 @@ impl DaktronicsSingularUiApp {
                     .map(Message::HeaderMessage)
                 },
                 match &self.screen {
-                    Screen::Configure => configure(
-                        &self.profile,
-                        &self.sport_type_keys,
-                        Message::HandleConfigureEvent,
-                    )
+                    Screen::Configure => self.profile.view(&self.sport_type_keys).map(Message::ProfileConfigureMessage)
                     .into(),
                     Screen::SetUp(public_token) => container(
                         scrollable(

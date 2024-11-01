@@ -18,7 +18,7 @@ use tokio::{
 };
 use tokio_serial::SerialPortBuilderExt;
 
-use crate::{mock::MockDataSource, APP_USER_AGENT};
+use crate::{backend::serializer::serialize_mappings, mock::MockDataSource, APP_USER_AGENT};
 
 use super::{network::put_to_server, profile::Profile};
 
@@ -152,9 +152,8 @@ impl ActiveStream {
 
         let network_processing_join_handle = {
             let serialized = serialized.clone();
-            let composition_name = profile.subcomp_name.clone();
             let data_stream_url = profile.data_stream_url.clone();
-            let mapping = profile.mapping.clone();
+            let mappings = profile.mappings.clone();
             let client = reqwest::Client::builder()
                 .user_agent(APP_USER_AGENT)
                 .http2_keep_alive_while_idle(true)
@@ -175,11 +174,8 @@ impl ActiveStream {
                 loop {
                     let serialized = { serialized.lock().await.take() };
                     if let Some(value) = serialized {
-                        match mapping.map(
-                            &composition_name,
-                            &value,
-                            profile.exclude_incomplete_data,
-                        ) {
+                        match serialize_mappings(&mappings, &value, profile.exclude_incomplete_data)
+                        {
                             Ok(serialized) => {
                                 let stringified = serialized.to_string();
                                 let stringified_bytes = stringified.as_bytes().len();

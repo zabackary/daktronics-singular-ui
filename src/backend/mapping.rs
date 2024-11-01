@@ -226,12 +226,10 @@ pub struct Mapping {
 impl Mapping {
     pub fn map(
         &self,
-        source_composition_name: &str,
         source: &serde_json::Value,
         exclude_incomplete_data: bool,
     ) -> Result<serde_json::Value, MapError> {
         let source_map = source.as_object().ok_or(MapError::SourceNotMap)?;
-        let mut value = serde_json::Map::new();
         // map could be underfilled if fields are disabled, but that's okay
         let mut destination = serde_json::Map::with_capacity(self.items.len());
         for item in &self.items {
@@ -251,11 +249,7 @@ impl Mapping {
                 Err(err) => return Err(err),
             }
         }
-        value.insert(
-            source_composition_name.to_string(),
-            serde_json::Value::Object(destination),
-        );
-        Ok(serde_json::Value::Object(value))
+        Ok(serde_json::Value::Object(destination))
     }
 }
 

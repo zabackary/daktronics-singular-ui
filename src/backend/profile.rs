@@ -1,4 +1,5 @@
 use serde::{de::Error, Deserialize, Serialize};
+use serde_json::Value;
 
 use super::{mapping::Mapping, sports::DynamicSportType};
 
@@ -90,7 +91,7 @@ impl Profile {
     }
 
     pub fn import(source: &str) -> Result<Self, serde_json::Error> {
-        let value = serde_json::Value::from(source);
+        let value = serde_json::from_str::<Value>(source)?;
         let version = value
             .as_object()
             .ok_or(serde_json::Error::invalid_type(
