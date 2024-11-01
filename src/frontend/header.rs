@@ -1,88 +1,32 @@
 use iced::{
     border::Radius,
     widget::{
-        button, column, component, container, horizontal_space, row, svg, text, text_input,
-        vertical_space, Component, Space,
+        button, column, container, horizontal_space, row, svg, text, text_input, vertical_space,
+        Space,
     },
-    Border, Color, Element, Length, Padding, Renderer, Shadow, Size, Theme,
+    Border, Color, Element, Length, Padding, Shadow, Theme,
 };
 
 use crate::APP_NAME;
 
 use super::utils::{icon_button, rounded_button, rounded_text_input_style};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum HeaderScreen {
     Configure,
     SetUp,
     Stream,
 }
 
-pub struct Header<'a, Message: Clone> {
-    screen: HeaderScreen,
-    enabled: bool,
-    on_switch: Box<dyn Fn(HeaderScreen) -> Message>,
-    profile_name: &'a str,
-    on_profile_name_change: Box<dyn Fn(String) -> Message>,
-    on_profile_import: Message,
-    on_profile_export: Message,
-    on_profile_add: Message,
-    on_end_stream: Option<Message>,
-}
-
-impl<'a, Message: Clone> Header<'a, Message> {
-    pub fn new(
-        screen: HeaderScreen,
-        enabled: bool,
-        on_switch: impl Fn(HeaderScreen) -> Message + 'static,
-        profile_name: &'a str,
-        on_profile_name_change: impl Fn(String) -> Message + 'static,
-        on_profile_import: Message,
-        on_profile_export: Message,
-        on_profile_add: Message,
-        on_end_stream: Option<Message>,
-    ) -> Header<Message> {
-        Header::<Message> {
-            screen,
-            enabled,
-            on_switch: Box::new(on_switch),
-            profile_name,
-            on_profile_name_change: Box::new(on_profile_name_change),
-            on_profile_import,
-            on_profile_export,
-            on_profile_add,
-            on_end_stream,
-        }
-    }
-}
-
-pub fn header<Message: Clone>(
-    screen: HeaderScreen,
-    enabled: bool,
-    on_switch: impl Fn(HeaderScreen) -> Message + 'static,
-    profile_name: &str,
-    on_profile_name_change: impl Fn(String) -> Message + 'static,
-    on_profile_import: Message,
-    on_profile_export: Message,
-    on_profile_add: Message,
-    on_end_stream: Option<Message>,
-) -> Header<Message> {
-    Header::<Message>::new(
-        screen,
-        enabled,
-        on_switch,
-        profile_name,
-        on_profile_name_change,
-        on_profile_import,
-        on_profile_export,
-        on_profile_add,
-        on_end_stream,
-    )
+#[derive(Debug, Clone, Copy)]
+pub struct Header {
+    is_showing_end_stream_confirm: bool,
 }
 
 #[derive(Debug, Clone)]
-pub enum HeaderEvent {
+pub enum HeaderMessage {
     ScreenTabClicked(HeaderScreen),
+
     ProfileNameChange(String),
     ProfileImport,
     ProfileExport,
@@ -90,18 +34,6 @@ pub enum HeaderEvent {
     OpenEndStreamConfirm,
     EndStreamConfirmYes,
     EndStreamConfirmCancel,
-}
-
-pub struct HeaderState {
-    is_showing_end_stream_confirm: bool,
-}
-
-impl Default for HeaderState {
-    fn default() -> Self {
-        HeaderState {
-            is_showing_end_stream_confirm: false,
-        }
-    }
 }
 
 fn tab_button_style(
@@ -171,36 +103,52 @@ fn tab_button_style(
     }
 }
 
-impl<Message: Clone> Component<Message> for Header<'_, Message> {
-    type State = HeaderState;
+pub enum Update {
+    None,
+    Switch(HeaderScreen),
+    ChangeProfileName(String),
+    ImportProfile,
+    ExportProfile,
+    NewProfile,
+    EndStream,
+}
 
-    type Event = HeaderEvent;
+impl Header {
+    pub fn new() -> Self {
+        Self {
+            is_showing_end_stream_confirm: false,
+        }
+    }
 
-    fn update(&mut self, state: &mut Self::State, event: Self::Event) -> Option<Message> {
-        match event {
-            HeaderEvent::ScreenTabClicked(screen) => Some((self.on_switch)(screen)),
-            HeaderEvent::ProfileNameChange(new_name) => {
-                Some((self.on_profile_name_change)(new_name))
+    pub fn update(&mut self, message: HeaderMessage) -> Update {
+        match message {
+            HeaderMessage::ScreenTabClicked(screen) => Update::Switch(screen),
+            HeaderMessage::ProfileNameChange(new_name) => Update::ChangeProfileName(new_name),
+            HeaderMessage::ProfileImport => Update::ImportProfile,
+            HeaderMessage::ProfileExport => Update::ExportProfile,
+            HeaderMessage::ProfileAdd => Update::NewProfile,
+            HeaderMessage::OpenEndStreamConfirm => {
+                self.is_showing_end_stream_confirm = true;
+                Update::None
             }
-            HeaderEvent::ProfileImport => Some(self.on_profile_import.clone()),
-            HeaderEvent::ProfileExport => Some(self.on_profile_export.clone()),
-            HeaderEvent::ProfileAdd => Some(self.on_profile_add.clone()),
-            HeaderEvent::OpenEndStreamConfirm => {
-                state.is_showing_end_stream_confirm = true;
-                None
+            HeaderMessage::EndStreamConfirmCancel => {
+                self.is_showing_end_stream_confirm = false;
+                Update::None
             }
-            HeaderEvent::EndStreamConfirmCancel => {
-                state.is_showing_end_stream_confirm = false;
-                None
-            }
-            HeaderEvent::EndStreamConfirmYes => {
-                state.is_showing_end_stream_confirm = false;
-                self.on_end_stream.clone()
+            HeaderMessage::EndStreamConfirmYes => {
+                self.is_showing_end_stream_confirm = false;
+                Update::EndStream
             }
         }
     }
 
-    fn view(&self, state: &Self::State) -> Element<'_, Self::Event, Theme, Renderer> {
+    pub fn view<'a>(
+        &self,
+        enabled: bool,
+        header_screen: HeaderScreen,
+        show_end_stream: bool,
+        profile_name: &'a str,
+    ) -> Element<'a, HeaderMessage> {
         container(
             column([
                 row([
@@ -216,12 +164,12 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                     text(APP_NAME).size(18).into(),
                     horizontal_space().into(),
                     {
-                        let input = text_input("Profile name", self.profile_name)
+                        let input = text_input("Profile name", profile_name)
                             .style(rounded_text_input_style)
                             .padding(8)
                             .width(300);
-                        if self.enabled {
-                            input.on_input(HeaderEvent::ProfileNameChange)
+                        if enabled {
+                            input.on_input(HeaderMessage::ProfileNameChange)
                         } else {
                             input
                         }
@@ -230,21 +178,21 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                     icon_button(
                         include_bytes!("../../assets/icon_download.svg"),
                         "Import profile",
-                        self.enabled.then_some(HeaderEvent::ProfileImport),
+                        enabled.then_some(HeaderMessage::ProfileImport),
                         super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),
                     icon_button(
                         include_bytes!("../../assets/icon_upload.svg"),
                         "Export profile",
-                        self.enabled.then_some(HeaderEvent::ProfileExport),
+                        enabled.then_some(HeaderMessage::ProfileExport),
                         super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),
                     icon_button(
                         include_bytes!("../../assets/icon_add_circle.svg"),
                         "New profile",
-                        self.enabled.then_some(HeaderEvent::ProfileAdd),
+                        enabled.then_some(HeaderMessage::ProfileAdd),
                         super::utils::RoundedButtonVariant::Secondary,
                     )
                     .into(),
@@ -256,7 +204,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                 .into(),
                 row([container(row([
                     button(text("Configure"))
-                        .style(|theme, status| {
+                        .style(move |theme, status| {
                             tab_button_style(
                                 theme,
                                 status,
@@ -266,17 +214,18 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                                     top_right: 0.0,
                                     bottom_right: 0.0,
                                 },
-                                matches!(self.screen, HeaderScreen::Configure),
+                                matches!(header_screen, HeaderScreen::Configure),
                             )
                         })
                         .padding([10, 14])
                         .on_press_maybe(
-                            self.enabled
-                                .then_some(HeaderEvent::ScreenTabClicked(HeaderScreen::Configure)),
+                            enabled.then_some(HeaderMessage::ScreenTabClicked(
+                                HeaderScreen::Configure,
+                            )),
                         )
                         .into(),
                     button(text("Set up"))
-                        .style(|theme, status| {
+                        .style(move |theme, status| {
                             tab_button_style(
                                 theme,
                                 status,
@@ -286,17 +235,16 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                                     top_right: 0.0,
                                     bottom_right: 0.0,
                                 },
-                                matches!(self.screen, HeaderScreen::SetUp),
+                                matches!(header_screen, HeaderScreen::SetUp),
                             )
                         })
                         .padding([10, 14])
                         .on_press_maybe(
-                            self.enabled
-                                .then_some(HeaderEvent::ScreenTabClicked(HeaderScreen::SetUp)),
+                            enabled.then_some(HeaderMessage::ScreenTabClicked(HeaderScreen::SetUp)),
                         )
                         .into(),
                     button(text("Stream"))
-                        .style(|theme, status| {
+                        .style(move |theme, status| {
                             tab_button_style(
                                 theme,
                                 status,
@@ -306,35 +254,35 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                                     top_left: 0.0,
                                     bottom_left: 0.0,
                                 },
-                                matches!(self.screen, HeaderScreen::Stream),
+                                matches!(header_screen, HeaderScreen::Stream),
                             )
                         })
                         .padding([10, 14])
                         .on_press_maybe(
-                            self.enabled
-                                .then_some(HeaderEvent::ScreenTabClicked(HeaderScreen::Stream)),
+                            enabled
+                                .then_some(HeaderMessage::ScreenTabClicked(HeaderScreen::Stream)),
                         )
                         .into(),
                 ]))
                 .width(Length::Fill)
                 .align_x(iced::alignment::Horizontal::Center)
                 .into()])
-                .push_maybe(self.on_end_stream.is_some().then(|| {
+                .push_maybe(show_end_stream.then(|| {
                     container(
-                        row(if state.is_showing_end_stream_confirm {
+                        row(if self.is_showing_end_stream_confirm {
                             [
                                 text("Are you sure you want to end the stream?").into(),
                                 rounded_button(
                                     "Cancel",
                                     super::utils::RoundedButtonVariant::Secondary,
                                 )
-                                .on_press(HeaderEvent::EndStreamConfirmCancel)
+                                .on_press(HeaderMessage::EndStreamConfirmCancel)
                                 .into(),
                                 rounded_button(
                                     "Confirm",
                                     super::utils::RoundedButtonVariant::Danger,
                                 )
-                                .on_press(HeaderEvent::EndStreamConfirmYes)
+                                .on_press(HeaderMessage::EndStreamConfirmYes)
                                 .into(),
                             ]
                         } else {
@@ -345,7 +293,7 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
                                     "End stream",
                                     super::utils::RoundedButtonVariant::Primary,
                                 )
-                                .on_press(HeaderEvent::OpenEndStreamConfirm)
+                                .on_press(HeaderMessage::OpenEndStreamConfirm)
                                 .into(),
                             ]
                         })
@@ -374,8 +322,8 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
             ])
             .width(Length::Fill),
         )
-        .style(|theme| {
-            if self.enabled {
+        .style(move |theme| {
+            if enabled {
                 container::transparent(theme)
             } else {
                 container::transparent(theme)
@@ -383,21 +331,5 @@ impl<Message: Clone> Component<Message> for Header<'_, Message> {
             }
         })
         .into()
-    }
-
-    fn size_hint(&self) -> Size<Length> {
-        Size {
-            width: Length::Fill,
-            height: Length::Shrink,
-        }
-    }
-}
-
-impl<'a, Message: Clone> From<Header<'a, Message>> for Element<'a, Message>
-where
-    Message: 'a,
-{
-    fn from(header: Header<'a, Message>) -> Self {
-        component(header)
     }
 }

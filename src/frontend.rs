@@ -9,7 +9,6 @@ mod welcome;
 use std::path::PathBuf;
 
 use configure::{configure, ConfigureEvent};
-use header::{header, HeaderScreen};
 use iced::border::Radius;
 use iced::widget::{column, container, horizontal_space, row, scrollable, svg, text, text_input};
 use iced::{Alignment, Element, Length, Subscription, Task};
@@ -31,6 +30,7 @@ pub struct DaktronicsSingularUiApp {
     pub hide_header: bool,
     pub unattended: Option<usize>,
     pub initial_tty_path: Option<String>,
+    pub header: header::Header,
 }
 
 fn use_dark_mode() -> bool {
@@ -48,6 +48,7 @@ impl Default for DaktronicsSingularUiApp {
             hide_header: false,
             unattended: None,
             initial_tty_path: None,
+            header: header::Header::new(),
         }
     }
 }
@@ -67,7 +68,7 @@ pub enum Message {
     WelcomeImportProfile,
     WelcomeGitHub,
     EndStream,
-    SwitchScreen(HeaderScreen),
+    SwitchScreen(header::HeaderScreen),
     ProfileNameChange(String),
     UpdateStreamStats,
     UpdateStreamStatsResponse(Vec<WorkerEvent>),
@@ -81,6 +82,7 @@ pub enum Message {
 
     StreamRunningMessage(stream_running::StreamRunningMessage),
     StreamStartMessage(stream_start::StreamStartMessage),
+    HeaderMessage(header::HeaderMessage),
 }
 
 #[derive(Debug, Default)]
@@ -277,9 +279,9 @@ impl DaktronicsSingularUiApp {
             }
             Message::SwitchScreen(new_screen) => {
                 self.screen = match new_screen {
-                    HeaderScreen::Configure => Screen::Configure,
-                    HeaderScreen::SetUp => Screen::SetUp(String::new()),
-                    HeaderScreen::Stream => {
+                    header::HeaderScreen::Configure => Screen::Configure,
+                    header::HeaderScreen::SetUp => Screen::SetUp(String::new()),
+                    header::HeaderScreen::Stream => {
                         Screen::StreamStart(stream_start::StreamStart::new(), None)
                     }
                 };
@@ -425,6 +427,18 @@ impl DaktronicsSingularUiApp {
                 _ => Task::none(),
             },
 
+            Message::HeaderMessage(message) => match self.header.update(message) {
+                // TODO: many of these messages can just be moved here.
+                header::Update::None => Task::none(),
+                header::Update::NewProfile => Task::done(Message::TryNewProfile),
+                header::Update::ChangeProfileName(new) => {
+                    Task::done(Message::ProfileNameChange(new))
+                }
+                header::Update::EndStream => Task::done(Message::EndStream),
+                header::Update::ExportProfile => Task::done(Message::ExportProfile),
+                header::Update::ImportProfile => Task::done(Message::TryImportProfile),
+                header::Update::Switch(new_screen) => Task::done(Message::SwitchScreen(new_screen)),
+            },
             Message::StreamRunningMessage(message) => match self.screen {
                 Screen::StreamRunning(ref mut stream_running, ref mut stream) => {
                     match stream_running.update(message) {
@@ -542,23 +556,18 @@ impl DaktronicsSingularUiApp {
                     })
                     .into()
                 } else {
-                    header(
+                    self.header.view(
+                        !matches!(self.screen, Screen::StreamRunning(_, _)),
                         match self.screen {
-                            Screen::Configure => HeaderScreen::Configure,
-                            Screen::SetUp(_) => HeaderScreen::SetUp,
-                            Screen::StreamRunning(_, _) | Screen::StreamStart(_, _) => HeaderScreen::Stream,
+                            Screen::Configure => header::HeaderScreen::Configure,
+                            Screen::SetUp(_) => header::HeaderScreen::SetUp,
+                            Screen::StreamRunning(_, _) | Screen::StreamStart(_, _) => header::HeaderScreen::Stream,
                             Screen::Welcome => unreachable!(),
                         },
-                        !matches!(self.screen, Screen::StreamRunning(_, _)),
-                        Message::SwitchScreen,
+                        matches!(self.screen, Screen::StreamRunning(_, _)),
                         &self.profile.name,
-                        Message::ProfileNameChange,
-                        Message::TryImportProfile,
-                        Message::ExportProfile,
-                        Message::TryNewProfile,
-                        matches!(self.screen, Screen::StreamRunning(_, _)).then_some(Message::EndStream),
                     )
-                    .into()
+                    .map(Message::HeaderMessage)
                 },
                 match &self.screen {
                     Screen::Configure => configure(
