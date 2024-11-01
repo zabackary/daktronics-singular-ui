@@ -14,6 +14,7 @@ pub mod transformation {
         None,
         TimeMinutes,
         TimeSeconds,
+        TimeSecondsRoundUp,
         TimeTenths,
         AppendOrdinalSuffix,
         AssertString,
@@ -27,6 +28,7 @@ pub mod transformation {
                 Transformation::None => "No transformation",
                 Transformation::TimeMinutes => "Extract minutes from time",
                 Transformation::TimeSeconds => "Extract seconds from time",
+                Transformation::TimeSecondsRoundUp => "Extract seconds from time, rounding up",
                 Transformation::TimeTenths => "Extract tenths from time",
                 Transformation::AppendOrdinalSuffix => "Append ordinal suffix to number",
                 Transformation::AssertString => "Assert string",
@@ -104,6 +106,25 @@ pub mod transformation {
                             // Parse as a number
                             .parse::<i32>()
                             .map_err(TransformationError::ParseInt)?,
+                    )))
+                }
+                Transformation::TimeSecondsRoundUp => {
+                    // get the fractional seconds value from the scoreboard by
+                    // combining the seconds and tenths parts
+                    let seconds = Transformation::transform(&Transformation::TimeSeconds, value)?
+                        .as_number()
+                        .unwrap() // rationale: look at the code above, it's a number.
+                        .as_f64()
+                        .unwrap() // rationale: f64 can fit all i32s, and it was parsed as i32
+                        + Transformation::transform(&Transformation::TimeTenths, value)?
+                            .as_number()
+                            .unwrap() // rationales same as above
+                            .as_f64()
+                            .unwrap()
+                            / 10.0;
+                    // Ceiling it and cast to i32. that should be safe?
+                    Ok(serde_json::Value::Number(serde_json::Number::from(
+                        seconds.ceil() as i32,
                     )))
                 }
                 Transformation::TimeTenths => {
