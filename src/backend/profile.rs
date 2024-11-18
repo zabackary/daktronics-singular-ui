@@ -108,7 +108,7 @@ impl Profile {
             ))?;
         Ok(match version.split(".").next().unwrap() {
             "1" => serde_json::from_value::<ProfileV1>(value)?.into(),
-            // "2" => serde_json::from_value::<ProfileV2>(value)?.into(),
+            "2" => serde_json::from_value::<ProfileV2>(value)?.into(),
             _ => Err(serde_json::Error::invalid_value(
                 serde::de::Unexpected::Other("unknown version"),
                 &"1.0 or 2.0",
