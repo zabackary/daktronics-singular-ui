@@ -94,6 +94,9 @@ is highly portable, so a MacOS version is possible. However,
 and I don't own a MacOS machine (I do have an old Mac Mini, so I might turn that
 into a build server, but no promises).
 
+Make sure to put the binary in somewhere on your PATH (e.g. `~/.local/bin`) for
+command-line usage. Feel free to remove the target triple from the name as well.
+
 ### From source
 
 To build from source, make sure you have a Rust toolchain installed, then do:
