@@ -3,7 +3,7 @@ pub mod latency_graph;
 use std::{
     error::Error,
     sync::Arc,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use daktronics_allsport_5000::{sports::Sport, RTDState};
@@ -173,9 +173,17 @@ impl ActiveStream {
 
                 loop {
                     let serialized = { serialized.lock().await.take() };
+                    let timestamp = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .expect("what are you doing with your clock set so early?!")
+                        .as_millis();
                     if let Some(value) = serialized {
-                        match serialize_mappings(&mappings, &value, profile.exclude_incomplete_data)
-                        {
+                        match serialize_mappings(
+                            &mappings,
+                            &value,
+                            profile.exclude_incomplete_data,
+                            Some(timestamp as i64),
+                        ) {
                             Ok(serialized) => {
                                 let stringified = serialized.to_string();
                                 let stringified_bytes = stringified.as_bytes().len();

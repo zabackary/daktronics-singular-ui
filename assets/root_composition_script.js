@@ -1,11 +1,13 @@
 const DATA_STREAM_PUBLIC_TOKEN = "{{ token }}";
 const APPLY_CHECKBOX_KEY = "__APPLY_CHECKBOX";
+const TIMESTAMP_KEY = "__TIMESTAMP";
 
 /**
- * Handling code for recieving data from the DSU native application.
+ * Handling code for receiving data from the DSU native application.
  *
- * Recieves data in the following format:
+ * Receives data in the following format:
  * {
+ *   "__TIMESTAMP": 923498324, // ms since epoch
  *   "subcompName": {
  *     "__APPLY_CHECKBOX": "Control Node Name", // name of checkbox to use to determine whether this subcomp should be applied
  *     "Control Node 1": "Control Node value",
@@ -17,6 +19,7 @@ const APPLY_CHECKBOX_KEY = "__APPLY_CHECKBOX";
 
 (function () {
   let dataStream;
+  let lastReceived = 0;
 
   return {
     init: function (comp, context) {
@@ -25,8 +28,18 @@ const APPLY_CHECKBOX_KEY = "__APPLY_CHECKBOX";
         DATA_STREAM_PUBLIC_TOKEN,
         (status, data) => {
           if (status === "message") {
+            const { [TIMESTAMP_KEY]: timestamp, ...payload } = data.payload;
+            if (timestamp < lastReceived) {
+              console.warn(
+                "Received an outdated message, skipping.",
+                timestamp,
+                lastReceived
+              );
+              return;
+            }
+            lastReceived = timestamp;
             console.info("Latency:", new Date().getTime() - data.ts);
-            for (const [key, value] of Object.entries(data.payload)) {
+            for (const [key, value] of Object.entries(payload)) {
               const subComp = comp.find(key)[0];
               if (subComp) {
                 let shouldUpdate = true;
