@@ -9,9 +9,13 @@
 
 [![CI status](https://github.com/zabackary/daktronics-singular-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/zabackary/daktronics-singular-ui/actions/workflows/ci.yml)
 
-## Demo video
+## Demo video of UI
 
 [daktronics-singular-ui-demo.webm](https://github.com/user-attachments/assets/473b455a-af18-4af5-89aa-710fdfc68522)
+
+## Demo video of output livestream
+
+[![livestream on YouTube](https://img.youtube.com/vi/vRcEqqiWRZE/0.jpg)](https://youtu.be/vRcEqqiWRZE?t=4203)
 
 ## Usage
 
