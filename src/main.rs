@@ -119,7 +119,7 @@ fn main() -> Result<(), DSUError> {
         .map_err(DSUError::LoggerInitialization)?
         .log_to_file(FileSpec::default().suppress_timestamp())
         .o_append(false)
-        .log_to_stderr()
+        .duplicate_to_stderr(flexi_logger::Duplicate::Warn)
         .write_mode(WriteMode::BufferAndFlush)
         .start()
         .map_err(DSUError::LoggerInitialization)?;
