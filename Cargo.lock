@@ -933,7 +933,7 @@ dependencies = [
 
 [[package]]
 name = "daktronics-singular-ui"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "clap",
  "daktronics-allsport-5000",
