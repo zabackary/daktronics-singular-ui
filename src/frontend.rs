@@ -308,8 +308,9 @@ impl DaktronicsSingularUiApp {
                         && self.initial_tty_path.is_some()
                         && active_stream.errors().len() > self.unattended.unwrap()
                     {
-                        eprintln!(
-                            "ERR frontend Stream will be restarted due to volume of errors ({}) exceeding configured value ({}) (unattended mode)",
+                        log::error!(
+                            target: "frontend",
+                            "Stream will be restarted due to volume of errors ({}) exceeding configured value ({}) (unattended mode)",
                             active_stream.errors().len(),
                             self.unattended.unwrap()
                         );
@@ -322,10 +323,10 @@ impl DaktronicsSingularUiApp {
                                     stream_running::StreamRunning::new(),
                                     stream,
                                 );
-                                eprintln!("INFO frontend Restarted stream successfully");
+                                log::info!(target: "frontend", "Restarted stream successfully");
                             }
                             Err(err) => {
-                                eprintln!("ERR frontend Failed to restart stream: {}", err);
+                                log::error!(target: "frontend", "Failed to restart stream: {}", err);
                             }
                         }
                     }

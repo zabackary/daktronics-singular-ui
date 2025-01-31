@@ -61,11 +61,13 @@ pub struct ActiveStream {
 
 impl ActiveStream {
     pub fn new(profile: Profile, tty_path: String) -> Result<Self, Box<dyn Error>> {
-        eprintln!(
-            "INFO stream Creating stream bound to {} with profile {}",
-            tty_path, profile.name
+        log::info!(
+            target: "stream",
+            "Creating stream bound to {} with profile {}",
+            tty_path,
+            profile.name
         );
-        let (worker_event_tx, worker_event_rx) = mpsc::channel(255);
+        let (worker_event_tx, worker_event_rx) = mpsc::channel(256);
 
         // allow because cargo gets suspicious on Windows
         #[allow(unused_mut)]
@@ -289,7 +291,7 @@ impl ActiveStream {
     ) {
         match event {
             WorkerEvent::ErrorEvent(err) => {
-                eprintln!("WARN stream {}", err.msg);
+                log::warn!(target: "stream", "Stream error: {}", err.msg);
                 errors.push(err)
             }
             WorkerEvent::LatencySampleEvent(

@@ -7,6 +7,7 @@ use std::{
 
 use backend::stream::ActiveStream;
 use clap::Parser;
+use flexi_logger::{FileSpec, Logger, WriteMode};
 use frontend::{DaktronicsSingularUiApp, Screen};
 use iced::{theme::Palette, window::icon, Color, Font, Size};
 
@@ -64,6 +65,7 @@ enum DSUError {
     ProfileFileRead(std::io::Error),
     ProfileFileParse(serde_json::Error),
     HeadlessNotSupported,
+    LoggerInitialization(flexi_logger::FlexiLoggerError),
 }
 
 impl Display for DSUError {
@@ -83,6 +85,9 @@ impl Display for DSUError {
             }
             Self::HeadlessNotSupported => {
                 write!(f, "headless mode is not supported yet")
+            }
+            Self::LoggerInitialization(logger_error) => {
+                write!(f, "failed to initialize logger: {}", logger_error)
             }
         }
     }
@@ -110,6 +115,15 @@ const DAKTRONICS_SINGULAR_UI_PROFILE_FILE_EXTENSION: &str = "dsu";
 const GITHUB_URL: &str = "https://github.com/zabackary/daktronics-singular-ui";
 
 fn main() -> Result<(), DSUError> {
+    let _logger = Logger::try_with_env_or_str("info")
+        .map_err(DSUError::LoggerInitialization)?
+        .log_to_file(FileSpec::default().suppress_timestamp())
+        .o_append(false)
+        .log_to_stderr()
+        .write_mode(WriteMode::BufferAndFlush)
+        .start()
+        .map_err(DSUError::LoggerInitialization)?;
+
     let args = Args::parse();
 
     if args.headless && !args.start {
@@ -205,7 +219,7 @@ fn main() -> Result<(), DSUError> {
             ) {
                 Ok(stream) => frontend::Screen::stream_running(stream),
                 Err(err) => {
-                    eprintln!("ERR main Couldn't start stream: {}", err);
+                    log::error!("Couldn't start stream: {}", err);
                     immediately_exit = true;
                     frontend::Screen::Welcome
                 }
