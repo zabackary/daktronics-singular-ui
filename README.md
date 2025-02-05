@@ -38,7 +38,7 @@ found below.
 daktronics-singular-ui \
   --profile /path/to/profile.dsu \ # the path to the profile
   --start \                        # automatically start streaming
-  --serial-path /dev/USB0 \        # which serial port to use
+  --serial-path /dev/ttyUSB0 \     # which serial port to use
   --hide-header \                  # hide the app header for small screens
   --unattended \                   # automatically restart on errors (default 3)
   --fullscreen                     # fullscreen UI
@@ -97,6 +97,9 @@ is highly portable, so a MacOS version is possible. However,
 [Apple does not make cross-compiling easy](https://users.rust-lang.org/t/is-cross-compile-from-linux-to-mac-supported/95105)
 and I don't own a MacOS machine (I do have an old Mac Mini, so I might turn that
 into a build server, but no promises).
+
+An aarch64-unknown-linux-gnu binary is built in CI but is in beta. When running
+on a Raspberry Pi I've noticed some upstream rendering bugs.
 
 Make sure to put the binary in somewhere on your PATH (e.g. `~/.local/bin`) for
 command-line usage. Feel free to remove the target triple from the name as well.
